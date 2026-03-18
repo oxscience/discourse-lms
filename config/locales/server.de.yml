@@ -1,0 +1,9 @@
+de:
+  site_settings:
+    lms_enabled: "LMS-Kurs-Funktionen für markierte Kategorien aktivieren"
+    lms_show_position_numbers: "Lektionsnummern in Themenlisten anzeigen"
+    lms_completion_button_text_complete: "Button-Text zum Markieren einer Lektion als abgeschlossen"
+    lms_completion_button_text_undo: "Button-Text zum Aufheben des Abschlusses"
+  discourse_lms:
+    notifications:
+      lesson_updated: "Eine abgeschlossene Lektion wurde aktualisiert"

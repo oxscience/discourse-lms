@@ -1,0 +1,13 @@
+en:
+  js:
+    discourse_lms:
+      mark_complete: "Mark as complete"
+      mark_incomplete: "Undo completion"
+      needs_review: "Updated — please review"
+      completed: "Completed"
+      progress: "%{completed} of %{total} lessons completed"
+      progress_short: "%{percent}%"
+      lesson: "Lesson"
+      course: "Course"
+      reorder: "Reorder lessons"
+      no_lessons: "No lessons in this course yet."

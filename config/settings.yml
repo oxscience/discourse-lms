@@ -1,0 +1,13 @@
+plugins:
+  lms_enabled:
+    default: false
+    client: true
+  lms_show_position_numbers:
+    default: true
+    client: true
+  lms_completion_button_text_complete:
+    default: "Als abgeschlossen markieren"
+    client: true
+  lms_completion_button_text_undo:
+    default: "Abschluss aufheben"
+    client: true

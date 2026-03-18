@@ -1,0 +1,13 @@
+de:
+  js:
+    discourse_lms:
+      mark_complete: "Als abgeschlossen markieren"
+      mark_incomplete: "Abschluss aufheben"
+      needs_review: "Aktualisiert — bitte erneut ansehen"
+      completed: "Abgeschlossen"
+      progress: "%{completed} von %{total} Lektionen abgeschlossen"
+      progress_short: "%{percent}%"
+      lesson: "Lektion"
+      course: "Kurs"
+      reorder: "Lektionen sortieren"
+      no_lessons: "Noch keine Lektionen in diesem Kurs."

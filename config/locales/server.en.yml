@@ -1,0 +1,9 @@
+en:
+  site_settings:
+    lms_enabled: "Enable LMS course features for marked categories"
+    lms_show_position_numbers: "Show lesson numbers in topic lists"
+    lms_completion_button_text_complete: "Button text for marking a lesson as complete"
+    lms_completion_button_text_undo: "Button text for undoing lesson completion"
+  discourse_lms:
+    notifications:
+      lesson_updated: "A lesson you completed has been updated"
