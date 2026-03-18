@@ -107,6 +107,71 @@ module DiscourseLms
       render json: { category_id: category.id, lessons: lessons }
     end
 
+    # GET /lms/dashboard
+    # Returns all LMS courses with progress for current user
+    def dashboard
+      lms_categories = Category.where(id:
+        CategoryCustomField.where(name: "lms_enabled", value: "t").pluck(:category_id)
+      ).select(:id, :name, :slug, :color)
+
+      courses = []
+
+      lms_categories.each do |cat|
+        next unless guardian.can_see?(cat)
+
+        topic_ids = Topic.where(category_id: cat.id)
+                         .where(archetype: Archetype.default)
+                         .where(deleted_at: nil)
+                         .pluck(:id)
+
+        total = topic_ids.size
+        next if total == 0
+
+        completed = 0
+        needs_review = 0
+
+        topic_ids.each do |tid|
+          data = PluginStore.get(PLUGIN_NAME, "completed_#{current_user.id}_#{tid}")
+          next unless data
+          completed += 1
+          needs_review += 1 if data.is_a?(Hash) && data["needs_review"]
+        end
+
+        # Find next uncompleted lesson
+        topics = Topic.where(category_id: cat.id)
+                      .where(archetype: Archetype.default)
+                      .where(deleted_at: nil)
+                      .select(:id, :title, :slug)
+
+        lessons = topics.map do |t|
+          pos = t.custom_fields["lms_position"]
+          data = PluginStore.get(PLUGIN_NAME, "completed_#{current_user.id}_#{t.id}")
+          { id: t.id, title: t.title, slug: t.slug, position: pos.to_i, completed: data.present? }
+        end.sort_by { |l| l[:position] }
+
+        next_lesson = lessons.find { |l| !l[:completed] }
+
+        course = {
+          category_id: cat.id,
+          name: cat.name,
+          slug: cat.slug,
+          color: cat.color,
+          total: total,
+          completed: completed,
+          needs_review: needs_review,
+          percent: ((completed.to_f / total) * 100).round
+        }
+        course[:next_lesson] = { id: next_lesson[:id], title: next_lesson[:title], slug: next_lesson[:slug] } if next_lesson
+
+        courses << course
+      end
+
+      # Sort: in-progress first, then not-started, then completed
+      courses.sort_by! { |c| c[:percent] == 100 ? 2 : (c[:percent] > 0 ? 0 : 1) }
+
+      render json: { courses: courses }
+    end
+
     # PUT /lms/reorder/:category_id
     # Admin-only: set lesson positions
     # Expects params[:positions] = { topic_id => position, ... }
