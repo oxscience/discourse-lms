@@ -39,8 +39,6 @@ after_initialize do
     get "/progress/:category_id" => "lms#category_progress"
     get "/lessons/:category_id" => "lms#category_lessons"
     put "/reorder/:category_id" => "lms#reorder"
-    get "/dashboard" => "lms#dashboard"
-    get "/kurse" => "lms#kurse_page"
   end
 
   Discourse::Application.routes.append do
