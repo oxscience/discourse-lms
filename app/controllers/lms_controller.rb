@@ -3,7 +3,9 @@
 module DiscourseLms
   class LmsController < ::ApplicationController
     requires_plugin DiscourseLms::PLUGIN_NAME
-    before_action :ensure_logged_in
+    before_action :ensure_logged_in, except: [:kurse_page]
+    skip_before_action :check_xhr, only: [:kurse_page]
+    skip_before_action :verify_authenticity_token, only: [:kurse_page]
 
     # POST /lms/complete/:topic_id
     # Toggle completion status for current user
@@ -180,9 +182,10 @@ module DiscourseLms
       ).select(:id, :name, :slug, :color, :parent_category_id)
 
       courses = []
+      user = current_user rescue nil
 
       lms_categories.each do |cat|
-        next unless guardian.can_see?(cat)
+        next unless Guardian.new(user).can_see?(cat)
 
         topic_ids = Topic.where(category_id: cat.id)
                          .where(archetype: Archetype.default)
@@ -194,27 +197,29 @@ module DiscourseLms
 
         completed = 0
         needs_review = 0
+        next_lesson = nil
 
-        topic_ids.each do |tid|
-          data = PluginStore.get(PLUGIN_NAME, "completed_#{current_user.id}_#{tid}")
-          next unless data
-          completed += 1
-          needs_review += 1 if data.is_a?(Hash) && data["needs_review"]
+        if user
+          topic_ids.each do |tid|
+            data = PluginStore.get(PLUGIN_NAME, "completed_#{user.id}_#{tid}")
+            next unless data
+            completed += 1
+            needs_review += 1 if data.is_a?(Hash) && data["needs_review"]
+          end
+
+          topics = Topic.where(category_id: cat.id)
+                        .where(archetype: Archetype.default)
+                        .where(deleted_at: nil)
+                        .select(:id, :title, :slug)
+
+          lessons = topics.map do |t|
+            pos = t.custom_fields["lms_position"]
+            data = PluginStore.get(PLUGIN_NAME, "completed_#{user.id}_#{t.id}")
+            { id: t.id, title: t.title, slug: t.slug, position: pos.to_i, completed: data.present? }
+          end.sort_by { |l| l[:position] }
+
+          next_lesson = lessons.find { |l| !l[:completed] }
         end
-
-        # Find next uncompleted lesson
-        topics = Topic.where(category_id: cat.id)
-                      .where(archetype: Archetype.default)
-                      .where(deleted_at: nil)
-                      .select(:id, :title, :slug)
-
-        lessons = topics.map do |t|
-          pos = t.custom_fields["lms_position"]
-          data = PluginStore.get(PLUGIN_NAME, "completed_#{current_user.id}_#{t.id}")
-          { id: t.id, title: t.title, slug: t.slug, position: pos.to_i, completed: data.present? }
-        end.sort_by { |l| l[:position] }
-
-        next_lesson = lessons.find { |l| !l[:completed] }
 
         # Build category URL
         parent = cat.parent_category_id ? Category.find_by(id: cat.parent_category_id) : nil
