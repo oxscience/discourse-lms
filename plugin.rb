@@ -40,11 +40,13 @@ after_initialize do
     get "/lessons/:category_id" => "lms#category_lessons"
     put "/reorder/:category_id" => "lms#reorder"
     get "/dashboard" => "lms#dashboard"
+    get "/kurse" => "lms#kurse_page"
   end
 
   Discourse::Application.routes.append do
     mount ::DiscourseLms::Engine, at: "/lms"
   end
+
 
   # --- Helper: check if a topic belongs to an LMS category ---
   lms_category_ids_cache = {}

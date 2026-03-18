@@ -1,0 +1,125 @@
+.lms-completion-wrapper {
+  margin-top: 1.5em;
+  padding-top: 1em;
+  border-top: 1px solid var(--primary-low);
+}
+.lms-complete-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+}
+.lms-complete-btn .lms-check-icon {
+  vertical-align: middle;
+}
+.lms-complete-btn.lms-done {
+  border-color: var(--success);
+  color: var(--success);
+}
+.lms-complete-btn.lms-needs-review {
+  border-color: var(--highlight);
+  color: var(--highlight);
+}
+.lms-next-lesson {
+  margin-top: 0.75em;
+}
+.lms-next-btn {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 500;
+}
+// Course header: stacks badge + progress vertically
+.lms-course-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5em;
+  margin: 0.5em 0 0.75em;
+}
+
+.lms-progress-bar {
+  max-width: 400px;
+  width: 100%;
+}
+.lms-progress-track {
+  height: 8px;
+  background: var(--primary-low);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.lms-progress-fill {
+  height: 100%;
+  background: var(--tertiary);
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+.lms-progress-label {
+  display: block;
+  font-size: 0.82em;
+  color: var(--primary-medium);
+  margin-top: 0.35em;
+}
+.lms-position {
+  font-weight: 700;
+  color: var(--primary-medium);
+  margin-right: 0.1em;
+}
+.lms-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  font-size: 0.75em;
+  padding: 0.1em 0.45em;
+  border-radius: 3px;
+  margin-left: 0.5em;
+  vertical-align: middle;
+  font-weight: normal;
+  color: var(--primary-medium);
+  border: 1px solid var(--primary-low);
+}
+.lms-status-badge.lms-done {
+  background: var(--primary-very-low);
+}
+.lms-status-badge.lms-review {
+  background: var(--highlight-low, var(--primary-low));
+}
+.lms-course-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7em;
+  padding: 0.15em 0.5em;
+  border-radius: 3px;
+  margin-left: 0.6em;
+  vertical-align: middle;
+  color: var(--tertiary);
+  background: var(--tertiary-very-low, var(--primary-very-low));
+  border: 1px solid var(--tertiary-low, var(--primary-low));
+  font-weight: 500;
+}
+
+// Admin toggle checkbox — inline next to category name
+.lms-admin-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  margin-left: 0.6em;
+  vertical-align: middle;
+  cursor: pointer;
+  font-size: 0.7em;
+  padding: 0.15em 0.5em;
+  border-radius: 3px;
+  font-weight: 500;
+  color: var(--tertiary);
+  background: var(--tertiary-very-low, var(--primary-very-low));
+  border: 1px solid var(--tertiary-low, var(--primary-low));
+  user-select: none;
+
+  .lms-admin-checkbox {
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--tertiary);
+  }
+
+  .lms-admin-label {
+    cursor: pointer;
+  }
+}
