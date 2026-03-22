@@ -168,7 +168,7 @@
   }
 
   // Add parentheses with leading space via CSS
-  &::before { content: " ("; white-space: pre; }
+  &::before { content: "   ("; white-space: pre; }
   &::after { content: ")"; }
 }
 
