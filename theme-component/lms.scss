@@ -110,14 +110,17 @@
     font-size: 0 !important;
   }
 
-  // Hide regular tags, only show vote counts
-  .discourse-tags .discourse-tag:not(.list-vote-count),
-  .discourse-tags li:not(:has(.list-vote-count)) {
+  // Hide regular tags, but show vote counts + status tags
+  .discourse-tags .discourse-tag:not(.list-vote-count):not([data-tag-name="geplant"]):not([data-tag-name="in-arbeit"]):not([data-tag-name="erledigt"]),
+  .discourse-tags li:not(:has(.list-vote-count)):not(:has([data-tag-name="geplant"])):not(:has([data-tag-name="in-arbeit"])):not(:has([data-tag-name="erledigt"])) {
     display: none !important;
   }
 
-  // Restore font size on vote count
-  .discourse-tags .list-vote-count {
+  // Restore font size on visible elements
+  .discourse-tags .list-vote-count,
+  .discourse-tags .discourse-tag[data-tag-name="geplant"],
+  .discourse-tags .discourse-tag[data-tag-name="in-arbeit"],
+  .discourse-tags .discourse-tag[data-tag-name="erledigt"] {
     font-size: 0.8rem !important;
   }
 
@@ -150,6 +153,36 @@
   &:hover {
     opacity: 0.85;
   }
+}
+
+// === Status tags: colored badges for roadmap process steps ===
+.discourse-tag[data-tag-name="geplant"],
+.discourse-tag[data-tag-name="in-arbeit"],
+.discourse-tag[data-tag-name="erledigt"] {
+  display: inline-flex !important;
+  padding: 0.2em 0.6em;
+  border-radius: 4px;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid;
+}
+
+.discourse-tag[data-tag-name="geplant"] {
+  color: var(--primary-medium);
+  background: var(--primary-very-low);
+  border-color: var(--primary-low);
+}
+
+.discourse-tag[data-tag-name="in-arbeit"] {
+  color: var(--highlight);
+  background: var(--highlight-low, rgba(255, 172, 51, 0.1));
+  border-color: var(--highlight-medium, rgba(255, 172, 51, 0.3));
+}
+
+.discourse-tag[data-tag-name="erledigt"] {
+  color: var(--success);
+  background: var(--success-low, rgba(35, 182, 96, 0.1));
+  border-color: var(--success-medium, rgba(35, 182, 96, 0.3));
 }
 
 // Vote button in topic view: larger and more prominent
