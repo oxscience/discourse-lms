@@ -259,48 +259,56 @@ export default apiInitializer((api) => {
             .then(function(data) {
               if (document.querySelector(".voting-overview")) return;
               var topics = (data.topic_list && data.topic_list.topics) || [];
-              var votable = topics
-                .filter(function(t) { return t.can_vote && !t.pinned; })
-                .sort(function(a, b) { return (b.vote_count || 0) - (a.vote_count || 0); });
+              // Filter: all non-pinned topics (category already has voting enabled)
+              var displayTopics = topics.filter(function(t) { return !t.pinned; });
 
-              if (votable.length === 0) return;
+              if (displayTopics.length === 0) return;
 
-              var maxVotes = 1;
-              votable.forEach(function(t) {
-                if ((t.vote_count || 0) > maxVotes) maxVotes = t.vote_count;
+              // Fetch vote counts for each topic individually
+              var promises = displayTopics.map(function(t) {
+                return ajax("/t/" + t.id + ".json").then(function(topicData) {
+                  return {
+                    id: t.id,
+                    slug: t.slug,
+                    fancy_title: t.fancy_title,
+                    vote_count: topicData.vote_count || 0
+                  };
+                }).catch(function() {
+                  return { id: t.id, slug: t.slug, fancy_title: t.fancy_title, vote_count: 0 };
+                });
               });
 
-              var overview = document.createElement("div");
-              overview.className = "voting-overview";
+              Promise.all(promises).then(function(votable) {
+                if (document.querySelector(".voting-overview")) return;
+                votable.sort(function(a, b) { return b.vote_count - a.vote_count; });
 
-              var html = '<h3>Abstimmungen</h3>';
-              html += '<ul class="voting-overview__list">';
+                var maxVotes = Math.max(1, votable.reduce(function(m, t) { return Math.max(m, t.vote_count); }, 0));
 
-              votable.forEach(function(t) {
-                var count = t.vote_count || 0;
-                var pct = maxVotes > 0 ? Math.round((count / maxVotes) * 100) : 0;
-                var zeroClass = count === 0 ? " --zero" : "";
-                html += '<li class="voting-overview__item">';
-                html += '<span class="voting-overview__count' + zeroClass + '">' + count + '</span>';
-                html += '<a href="/t/' + t.slug + '/' + t.id + '" class="voting-overview__title">' + t.fancy_title + '</a>';
-                html += '<div class="voting-overview__bar-bg"><div class="voting-overview__bar-fill" style="width:' + pct + '%"></div></div>';
-                html += '</li>';
+                var overview = document.createElement("div");
+                overview.className = "voting-overview";
+
+                var html = '<h3>Abstimmungen</h3>';
+                html += '<ul class="voting-overview__list">';
+
+                votable.forEach(function(t) {
+                  var count = t.vote_count;
+                  var pct = maxVotes > 0 ? Math.round((count / maxVotes) * 100) : 0;
+                  var zeroClass = count === 0 ? " --zero" : "";
+                  html += '<li class="voting-overview__item">';
+                  html += '<span class="voting-overview__count' + zeroClass + '">' + count + '</span>';
+                  html += '<a href="/t/' + t.slug + '/' + t.id + '" class="voting-overview__title">' + t.fancy_title + '</a>';
+                  html += '<div class="voting-overview__bar-bg"><div class="voting-overview__bar-fill" style="width:' + pct + '%"></div></div>';
+                  html += '</li>';
+                });
+
+                html += '</ul>';
+                overview.innerHTML = html;
+
+                var courseHeader = document.querySelector(".lms-course-header");
+                if (courseHeader) {
+                  courseHeader.after(overview);
+                }
               });
-
-              html += '</ul>';
-              overview.innerHTML = html;
-
-              // Insert after course header, or before topic list, or at end of main outlet
-              var courseHeader = document.querySelector(".lms-course-header");
-              var topicList = document.querySelector(".topic-list, .topic-list-container, .latest-topic-list, [class*='topic-list']");
-              if (courseHeader) {
-                courseHeader.after(overview);
-              } else if (topicList && topicList.parentElement) {
-                topicList.parentElement.insertBefore(overview, topicList);
-              } else {
-                var mainOutlet = document.querySelector("#main-outlet .regular, #main-outlet");
-                if (mainOutlet) mainOutlet.appendChild(overview);
-              }
             })
             .catch(function() {});
         }
