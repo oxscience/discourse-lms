@@ -250,63 +250,119 @@ export default apiInitializer((api) => {
         titleEl.after(header);
       }
 
-      // --- Roadmap: Voting Overview ---
-      if (isRoadmap && !document.querySelector(".voting-overview")) {
+      // --- Roadmap: Kanban Board ---
+      if (isRoadmap && !document.querySelector(".roadmap-board")) {
         var match = url.match(/\/c\/(.+?)(?:\?|$)/);
         if (match) {
           var categoryPath = match[1].replace(/\/l\/.*$/, "");
+
+          // Kanban columns: tag → label mapping (order matters)
+          var columns = [
+            { tag: "geplant", label: "Geplant", icon: "📋" },
+            { tag: "in-arbeit", label: "In Arbeit", icon: "🔨" },
+            { tag: "erledigt", label: "Erledigt", icon: "✅" }
+          ];
+          var columnTags = columns.map(function(c) { return c.tag; });
+
           ajax("/c/" + categoryPath + ".json")
             .then(function(data) {
-              if (document.querySelector(".voting-overview")) return;
+              if (document.querySelector(".roadmap-board")) return;
               var topics = (data.topic_list && data.topic_list.topics) || [];
-              // Filter: all non-pinned topics (category already has voting enabled)
               var displayTopics = topics.filter(function(t) { return !t.pinned; });
-
               if (displayTopics.length === 0) return;
 
-              // Fetch vote counts for each topic individually
+              // Fetch vote counts per topic
               var promises = displayTopics.map(function(t) {
-                return ajax("/t/" + t.id + ".json").then(function(topicData) {
+                return ajax("/t/" + t.id + ".json").then(function(td) {
                   return {
                     id: t.id,
                     slug: t.slug,
                     fancy_title: t.fancy_title,
-                    vote_count: topicData.vote_count || 0
+                    tags: t.tags || [],
+                    vote_count: td.vote_count || 0,
+                    excerpt: (t.excerpt || "").replace(/<[^>]*>/g, "").substring(0, 120)
                   };
                 }).catch(function() {
-                  return { id: t.id, slug: t.slug, fancy_title: t.fancy_title, vote_count: 0 };
+                  return {
+                    id: t.id, slug: t.slug, fancy_title: t.fancy_title,
+                    tags: t.tags || [], vote_count: 0, excerpt: ""
+                  };
                 });
               });
 
-              Promise.all(promises).then(function(votable) {
-                if (document.querySelector(".voting-overview")) return;
-                votable.sort(function(a, b) { return b.vote_count - a.vote_count; });
+              Promise.all(promises).then(function(items) {
+                if (document.querySelector(".roadmap-board")) return;
 
-                var maxVotes = Math.max(1, votable.reduce(function(m, t) { return Math.max(m, t.vote_count); }, 0));
+                // Group by column tag (first matching tag wins, untagged → first column)
+                var grouped = {};
+                columns.forEach(function(c) { grouped[c.tag] = []; });
 
-                var overview = document.createElement("div");
-                overview.className = "voting-overview";
-
-                var html = '<h3>Abstimmungen</h3>';
-                html += '<ul class="voting-overview__list">';
-
-                votable.forEach(function(t) {
-                  var count = t.vote_count;
-                  var pct = maxVotes > 0 ? Math.round((count / maxVotes) * 100) : 0;
-                  var zeroClass = count === 0 ? " --zero" : "";
-                  html += '<li class="voting-overview__item">';
-                  html += '<span class="voting-overview__count' + zeroClass + '">' + count + '</span>';
-                  html += '<a href="/t/' + t.slug + '/' + t.id + '" class="voting-overview__title">' + t.fancy_title + '</a>';
-                  html += '<div class="voting-overview__bar-bg"><div class="voting-overview__bar-fill" style="width:' + pct + '%"></div></div>';
-                  html += '</li>';
+                items.forEach(function(item) {
+                  var placed = false;
+                  for (var i = 0; i < columnTags.length; i++) {
+                    if (item.tags.indexOf(columnTags[i]) !== -1) {
+                      grouped[columnTags[i]].push(item);
+                      placed = true;
+                      break;
+                    }
+                  }
+                  if (!placed) {
+                    grouped[columns[0].tag].push(item);
+                  }
                 });
 
-                html += '</ul>';
-                overview.innerHTML = html;
+                // Sort each column by vote_count desc
+                columns.forEach(function(c) {
+                  grouped[c.tag].sort(function(a, b) { return b.vote_count - a.vote_count; });
+                });
+
+                var board = document.createElement("div");
+                board.className = "roadmap-board";
+
+                var html = '<div class="roadmap-columns">';
+                columns.forEach(function(col) {
+                  var items = grouped[col.tag];
+                  html += '<div class="roadmap-col">';
+                  html += '<div class="roadmap-col__header">';
+                  html += '<span class="roadmap-col__icon">' + col.icon + '</span>';
+                  html += '<span class="roadmap-col__label">' + col.label + '</span>';
+                  html += '<span class="roadmap-col__count">' + items.length + '</span>';
+                  html += '</div>';
+                  html += '<div class="roadmap-col__items">';
+
+                  if (items.length === 0) {
+                    html += '<div class="roadmap-card --empty">Keine Einträge</div>';
+                  }
+
+                  items.forEach(function(item) {
+                    html += '<a href="/t/' + item.slug + '/' + item.id + '" class="roadmap-card">';
+                    html += '<div class="roadmap-card__top">';
+                    html += '<span class="roadmap-card__title">' + item.fancy_title + '</span>';
+                    if (item.vote_count > 0) {
+                      html += '<span class="roadmap-card__votes">▲ ' + item.vote_count + '</span>';
+                    }
+                    html += '</div>';
+                    if (item.excerpt) {
+                      html += '<div class="roadmap-card__excerpt">' + item.excerpt + '</div>';
+                    }
+                    html += '</a>';
+                  });
+
+                  html += '</div></div>';
+                });
+                html += '</div>';
+
+                board.innerHTML = html;
+
+                // Hide the default topic list when roadmap board is shown
+                var topicList = document.querySelector(".topic-list, .latest-topic-list");
+                if (topicList) topicList.style.display = "none";
+                var navPills = document.querySelector(".navigation-container");
+                if (navPills) navPills.style.display = "none";
 
                 var courseHeader = document.querySelector(".lms-course-header");
                 if (courseHeader) {
-                  courseHeader.after(overview);
+                  courseHeader.after(board);
                 }
               });
             })
