@@ -96,9 +96,36 @@
   font-weight: 500;
 }
 
-// === Voting: style .list-vote-count in Horizon card layout ===
-// The native voting plugin renders .list-vote-count inside .discourse-tags
-// Horizon hides votes when vote_count == 0, so we style the plugin's own element
+// === Voting: show .list-vote-count in Horizon card layout ===
+// Horizon hides .link-bottom-line (which contains .discourse-tags + vote counts)
+// We un-hide it but only show the vote count, not the regular tags
+
+.topic-list.--d-topic-cards .topic-list-item .link-bottom-line {
+  display: flex !important;
+
+  // Un-hide .discourse-tags (Horizon hides it)
+  .discourse-tags {
+    display: flex !important;
+    // Hide comma separators between tags
+    font-size: 0 !important;
+  }
+
+  // Hide regular tags, only show vote counts
+  .discourse-tags .discourse-tag:not(.list-vote-count),
+  .discourse-tags li:not(:has(.list-vote-count)) {
+    display: none !important;
+  }
+
+  // Restore font size on vote count
+  .discourse-tags .list-vote-count {
+    font-size: 0.8rem !important;
+  }
+
+  // Hide category badge (already shown elsewhere)
+  .badge-category__wrapper {
+    display: none !important;
+  }
+}
 
 .list-vote-count {
   display: inline-flex !important;
@@ -109,15 +136,19 @@
   color: var(--tertiary);
   background: var(--tertiary-very-low, var(--primary-very-low));
   border: 1px solid var(--tertiary-low, var(--primary-low));
-  padding: 0.15em 0.55em;
+  padding: 0.2em 0.6em;
   border-radius: 4px;
-  margin-right: 0.5em;
   white-space: nowrap;
+  text-decoration: none;
 
   &.voted {
     color: var(--secondary);
     background: var(--tertiary);
     border-color: var(--tertiary);
+  }
+
+  &:hover {
+    opacity: 0.85;
   }
 }
 
