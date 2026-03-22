@@ -284,7 +284,13 @@ export default apiInitializer((api) => {
                 '<div class="roadmap-skeleton"></div>' +
                 '</div></div>';
             }).join("") + '</div>';
-          if (courseHeader) courseHeader.after(skeleton);
+          // Insert after nav pills (below breadcrumbs + tabs), fallback to course header
+          var navContainer = document.querySelector(".navigation-container");
+          if (navContainer) {
+            navContainer.after(skeleton);
+          } else if (courseHeader) {
+            courseHeader.after(skeleton);
+          }
 
           ajax("/c/" + categoryPath + ".json")
             .then(function(data) {
