@@ -25,6 +25,10 @@ after_initialize do
   Site.preloaded_category_custom_fields << "lms_enabled"
   register_category_custom_field_type("lms_enabled", :boolean)
 
+  # Category: is this a Roadmap (voting overview)?
+  Site.preloaded_category_custom_fields << "roadmap_enabled"
+  register_category_custom_field_type("roadmap_enabled", :boolean)
+
   # Topic: lesson position within course — preload in topic lists
   register_topic_custom_field_type("lms_position", :integer)
   TopicList.preloaded_custom_fields << "lms_position"
@@ -68,6 +72,15 @@ after_initialize do
   end
 
   add_to_serializer(:basic_category, :include_lms_enabled?) do
+    SiteSetting.lms_enabled
+  end
+
+  # Expose roadmap_enabled on categories
+  add_to_serializer(:basic_category, :roadmap_enabled) do
+    object.custom_fields["roadmap_enabled"]
+  end
+
+  add_to_serializer(:basic_category, :include_roadmap_enabled?) do
     SiteSetting.lms_enabled
   end
 

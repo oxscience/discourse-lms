@@ -5,13 +5,25 @@ export default apiInitializer((api) => {
   var siteSettings = api.container.lookup("service:site-settings");
   if (!siteSettings.lms_enabled) return;
 
-  function isLmsCategory(categoryId) {
-    if (!categoryId) return false;
+  function getCategoryById(categoryId) {
+    if (!categoryId) return null;
     var site = api.container.lookup("service:site");
-    var cat = site.categories?.find(function(c) { return c.id === categoryId; });
+    return site.categories?.find(function(c) { return c.id === categoryId; }) || null;
+  }
+
+  function isLmsCategory(categoryId) {
+    var cat = getCategoryById(categoryId);
     if (!cat) return false;
     if (cat.lms_enabled === true || cat.lms_enabled === "true") return true;
     if (cat.custom_fields?.lms_enabled === true || cat.custom_fields?.lms_enabled === "true") return true;
+    return false;
+  }
+
+  function isRoadmapCategory(categoryId) {
+    var cat = getCategoryById(categoryId);
+    if (!cat) return false;
+    if (cat.roadmap_enabled === true || cat.roadmap_enabled === "true") return true;
+    if (cat.custom_fields?.roadmap_enabled === true || cat.custom_fields?.roadmap_enabled === "true") return true;
     return false;
   }
 
@@ -129,13 +141,15 @@ export default apiInitializer((api) => {
       var isLms = isLmsCategory(categoryId);
 
       // Course header: badge/toggle + progress bar stacked vertically
+      var isRoadmap = isRoadmapCategory(categoryId);
       var titleEl = document.querySelector(".category-title-contents .category-name, .category-heading");
       if (titleEl && !document.querySelector(".lms-course-header")) {
         var header = document.createElement("div");
         header.className = "lms-course-header";
 
-        // Admin checkbox (always for admins)
+        // Admin checkboxes (always for admins)
         if (isAdmin) {
+          // Kurs checkbox
           var label = document.createElement("label");
           label.className = "lms-admin-toggle";
           label.title = isLms ? "Kurs-Modus deaktivieren" : "Als Kurs aktivieren";
@@ -162,8 +176,7 @@ export default apiInitializer((api) => {
               data: { "custom_fields[lms_enabled]": newState }
             })
               .then(function() {
-                var site = api.container.lookup("service:site");
-                var cat = site.categories?.find(function(c) { return c.id === categoryId; });
+                var cat = getCategoryById(categoryId);
                 if (cat) {
                   if (!cat.custom_fields) cat.custom_fields = {};
                   cat.custom_fields.lms_enabled = newState;
@@ -177,14 +190,113 @@ export default apiInitializer((api) => {
                 checkbox.disabled = false;
               });
           });
-        } else if (isLms) {
-          var courseBadge = document.createElement("span");
-          courseBadge.className = "lms-course-badge";
-          courseBadge.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin-right:0.3em"><path d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z"/></svg>Kurs';
-          header.appendChild(courseBadge);
+
+          // Roadmap checkbox
+          var rmLabel = document.createElement("label");
+          rmLabel.className = "lms-admin-toggle";
+          rmLabel.title = isRoadmap ? "Roadmap-Modus deaktivieren" : "Als Roadmap aktivieren";
+
+          var rmCheckbox = document.createElement("input");
+          rmCheckbox.type = "checkbox";
+          rmCheckbox.checked = isRoadmap;
+          rmCheckbox.className = "lms-admin-checkbox";
+
+          var rmLabelText = document.createElement("span");
+          rmLabelText.className = "lms-admin-label";
+          rmLabelText.textContent = "Roadmap";
+
+          rmLabel.appendChild(rmCheckbox);
+          rmLabel.appendChild(rmLabelText);
+          header.appendChild(rmLabel);
+
+          rmCheckbox.addEventListener("change", function() {
+            rmCheckbox.disabled = true;
+            var newState = rmCheckbox.checked;
+
+            ajax("/categories/" + categoryId + ".json", {
+              type: "PUT",
+              data: { "custom_fields[roadmap_enabled]": newState }
+            })
+              .then(function() {
+                var cat = getCategoryById(categoryId);
+                if (cat) {
+                  if (!cat.custom_fields) cat.custom_fields = {};
+                  cat.custom_fields.roadmap_enabled = newState;
+                }
+                rmCheckbox.disabled = false;
+                rmLabel.title = newState ? "Roadmap-Modus deaktivieren" : "Als Roadmap aktivieren";
+                window.location.reload();
+              })
+              .catch(function() {
+                rmCheckbox.checked = !newState;
+                rmCheckbox.disabled = false;
+              });
+          });
+        } else {
+          if (isLms) {
+            var courseBadge = document.createElement("span");
+            courseBadge.className = "lms-course-badge";
+            courseBadge.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin-right:0.3em"><path d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z"/></svg>Kurs';
+            header.appendChild(courseBadge);
+          }
+          if (isRoadmap) {
+            var roadmapBadge = document.createElement("span");
+            roadmapBadge.className = "lms-course-badge lms-roadmap-badge";
+            roadmapBadge.textContent = "Roadmap";
+            header.appendChild(roadmapBadge);
+          }
         }
 
         titleEl.after(header);
+      }
+
+      // --- Roadmap: Voting Overview ---
+      if (isRoadmap && !document.querySelector(".voting-overview")) {
+        var match = url.match(/\/c\/(.+?)(?:\?|$)/);
+        if (match) {
+          var categoryPath = match[1].replace(/\/l\/.*$/, "");
+          ajax("/c/" + categoryPath + ".json")
+            .then(function(data) {
+              if (document.querySelector(".voting-overview")) return;
+              var topics = (data.topic_list && data.topic_list.topics) || [];
+              var votable = topics
+                .filter(function(t) { return t.can_vote && !t.pinned; })
+                .sort(function(a, b) { return (b.vote_count || 0) - (a.vote_count || 0); });
+
+              if (votable.length === 0) return;
+
+              var maxVotes = 1;
+              votable.forEach(function(t) {
+                if ((t.vote_count || 0) > maxVotes) maxVotes = t.vote_count;
+              });
+
+              var overview = document.createElement("div");
+              overview.className = "voting-overview";
+
+              var html = '<h3>Abstimmungen</h3>';
+              html += '<ul class="voting-overview__list">';
+
+              votable.forEach(function(t) {
+                var count = t.vote_count || 0;
+                var pct = maxVotes > 0 ? Math.round((count / maxVotes) * 100) : 0;
+                var zeroClass = count === 0 ? " --zero" : "";
+                html += '<li class="voting-overview__item">';
+                html += '<span class="voting-overview__count' + zeroClass + '">' + count + '</span>';
+                html += '<a href="/t/' + t.slug + '/' + t.id + '" class="voting-overview__title">' + t.fancy_title + '</a>';
+                html += '<div class="voting-overview__bar-bg"><div class="voting-overview__bar-fill" style="width:' + pct + '%"></div></div>';
+                html += '</li>';
+              });
+
+              html += '</ul>';
+              overview.innerHTML = html;
+
+              var container = document.querySelector(".topic-list, .topic-list-container");
+              if (container && container.parentElement) {
+                container.parentElement.insertBefore(overview, container);
+              }
+            })
+            .catch(function() {});
+        }
       }
 
       if (!isLms) return;
