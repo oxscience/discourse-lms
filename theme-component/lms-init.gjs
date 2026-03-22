@@ -130,8 +130,10 @@ export default apiInitializer((api) => {
 
   // --- 2. Category Page: Course header + topic badges ---
   api.onPageChange(function(url) {
-    // Always clean up roadmap body class on navigation
+    // Always clean up roadmap elements on navigation
     document.body.classList.remove("roadmap-active");
+    var oldBoard = document.querySelector(".roadmap-board");
+    if (oldBoard) oldBoard.remove();
 
     if (!url.match(/^\/c\//)) return;
 
