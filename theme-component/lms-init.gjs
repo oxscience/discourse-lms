@@ -130,18 +130,24 @@ export default apiInitializer((api) => {
 
   // --- 2. Category Page: Course header + topic badges ---
   api.onPageChange(function(url) {
+    // Always clean up roadmap body class on navigation
+    document.body.classList.remove("roadmap-active");
+
     if (!url.match(/^\/c\//)) return;
 
     var categoryId = getCategoryIdFromUrl(url);
     if (!categoryId) return;
 
+    // Check roadmap IMMEDIATELY (before setTimeout) to prevent flash
+    var isRoadmap = isRoadmapCategory(categoryId);
+    if (isRoadmap) {
+      document.body.classList.add("roadmap-active");
+    }
+
     setTimeout(function() {
       var currentUser = api.getCurrentUser();
       var isAdmin = currentUser && currentUser.admin;
       var isLms = isLmsCategory(categoryId);
-
-      // Course header: badge/toggle + progress bar stacked vertically
-      var isRoadmap = isRoadmapCategory(categoryId);
       var titleEl = document.querySelector(".category-title-contents .category-name, .category-heading");
       if (titleEl && !document.querySelector(".lms-course-header")) {
         var header = document.createElement("div");
@@ -252,12 +258,6 @@ export default apiInitializer((api) => {
 
       // --- Roadmap: Kanban Board ---
       if (isRoadmap && !document.querySelector(".roadmap-board")) {
-        // IMMEDIATELY hide topic list & nav to prevent flash
-        var topicList = document.querySelector(".topic-list, .latest-topic-list");
-        if (topicList) topicList.style.display = "none";
-        var navPills = document.querySelector(".navigation-container");
-        if (navPills) navPills.style.display = "none";
-
         var match = url.match(/\/c\/(.+?)(?:\?|$)/);
         if (match) {
           var categoryPath = match[1].replace(/\/l\/.*$/, "");

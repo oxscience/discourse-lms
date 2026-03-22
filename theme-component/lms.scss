@@ -131,6 +131,15 @@
   border: 1px solid var(--tertiary-low, var(--primary-low));
 }
 
+// === Roadmap: instant hide topic list & nav ===
+body.roadmap-active {
+  .topic-list,
+  .latest-topic-list,
+  .navigation-container {
+    display: none !important;
+  }
+}
+
 // === Roadmap Kanban Board ===
 .roadmap-board {
   margin-bottom: 1.5em;
