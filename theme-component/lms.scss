@@ -168,21 +168,21 @@
 }
 
 .discourse-tag[data-tag-name="geplant"] {
-  color: var(--primary-medium);
-  background: var(--primary-very-low);
-  border-color: var(--primary-low);
+  color: #8a9bae;
+  background: rgba(138, 155, 174, 0.12);
+  border-color: rgba(138, 155, 174, 0.3);
 }
 
 .discourse-tag[data-tag-name="in-arbeit"] {
-  color: var(--highlight);
-  background: var(--highlight-low, rgba(255, 172, 51, 0.1));
-  border-color: var(--highlight-medium, rgba(255, 172, 51, 0.3));
+  color: #e9a84c;
+  background: rgba(233, 168, 76, 0.12);
+  border-color: rgba(233, 168, 76, 0.3);
 }
 
 .discourse-tag[data-tag-name="erledigt"] {
-  color: var(--success);
-  background: var(--success-low, rgba(35, 182, 96, 0.1));
-  border-color: var(--success-medium, rgba(35, 182, 96, 0.3));
+  color: #4ec66c;
+  background: rgba(78, 198, 108, 0.12);
+  border-color: rgba(78, 198, 108, 0.3);
 }
 
 // Vote button in topic view: larger and more prominent
