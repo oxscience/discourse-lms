@@ -186,11 +186,19 @@
 }
 
 // Vote button in topic view: larger and more prominent
-.topic-voting .vote-button button,
-#topic-title .vote-button button {
-  padding: 0.5em 1em !important;
-  font-size: 0.95em !important;
-  min-width: 7em;
+.topic-title-voting .vote-button,
+.title-voting .vote-button {
+  padding: 0.55em 1.2em !important;
+  font-size: 1em !important;
+  min-width: 8em;
+}
+
+// Vote count box next to button
+.topic-title-voting .vote-count-wrapper,
+.title-voting .vote-count-wrapper {
+  min-width: 2.8em;
+  min-height: 2.8em;
+  font-size: 1.1em;
 }
 
 // Admin toggle checkbox — inline next to category name
