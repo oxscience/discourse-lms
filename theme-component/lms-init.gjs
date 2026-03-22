@@ -379,19 +379,19 @@ export default apiInitializer((api) => {
                 skeleton.classList.remove("roadmap-board--loading");
                 skeleton.innerHTML = html;
 
-                // --- Drag & Drop ---
-                if (!isAdmin) return; // Only admins can drag
+                // --- Drag & Drop (admin only) ---
+                if (!isAdmin) return;
 
                 var dragCard = null;
+                var didDrag = false;
 
                 skeleton.querySelectorAll(".roadmap-card[draggable]").forEach(function(card) {
                   card.addEventListener("dragstart", function(e) {
                     dragCard = card;
+                    didDrag = true;
                     card.classList.add("--dragging");
                     e.dataTransfer.effectAllowed = "move";
                     e.dataTransfer.setData("text/plain", card.dataset.topicId);
-                    // Prevent navigation on drag
-                    e.stopPropagation();
                   });
 
                   card.addEventListener("dragend", function() {
@@ -400,13 +400,15 @@ export default apiInitializer((api) => {
                     skeleton.querySelectorAll(".roadmap-col__items").forEach(function(col) {
                       col.classList.remove("--drag-over");
                     });
+                    // Reset drag flag after a tick so click handler can catch it
+                    setTimeout(function() { didDrag = false; }, 50);
                   });
 
-                  // Prevent click navigation during drag
+                  // Prevent click navigation after drag
                   card.addEventListener("click", function(e) {
-                    if (card.classList.contains("--was-dragged")) {
+                    if (didDrag) {
                       e.preventDefault();
-                      card.classList.remove("--was-dragged");
+                      e.stopPropagation();
                     }
                   });
                 });
@@ -426,12 +428,20 @@ export default apiInitializer((api) => {
 
                   colEl.addEventListener("drop", function(e) {
                     e.preventDefault();
+                    e.stopImmediatePropagation();
                     colEl.classList.remove("--drag-over");
                     if (!dragCard) return;
 
                     var newColumn = colEl.dataset.column;
                     var topicId = dragCard.dataset.topicId;
                     var currentTags = JSON.parse(dragCard.dataset.tags.replace(/&quot;/g, '"'));
+
+                    // Skip if dropped in same column
+                    var oldColumn = null;
+                    for (var i = 0; i < columnTags.length; i++) {
+                      if (currentTags.indexOf(columnTags[i]) !== -1) { oldColumn = columnTags[i]; break; }
+                    }
+                    if (oldColumn === newColumn) return;
 
                     // Remove old column tags, add new one
                     var newTags = currentTags.filter(function(t) {
@@ -443,16 +453,13 @@ export default apiInitializer((api) => {
                     var emptyCard = colEl.querySelector(".--empty");
                     if (emptyCard) emptyCard.remove();
                     colEl.appendChild(dragCard);
-                    dragCard.dataset.tags = JSON.stringify(newTags);
-                    dragCard.classList.add("--was-dragged");
+                    dragCard.dataset.tags = JSON.stringify(newTags).replace(/"/g, "&quot;");
 
                     // Update counts
                     skeleton.querySelectorAll(".roadmap-col").forEach(function(col) {
-                      var tag = col.dataset.column;
                       var count = col.querySelectorAll(".roadmap-card[draggable]").length;
                       var countEl = col.querySelector(".roadmap-col__count");
                       if (countEl) countEl.textContent = count;
-                      // Show empty hint if column is empty
                       var itemsEl = col.querySelector(".roadmap-col__items");
                       if (count === 0 && !itemsEl.querySelector(".--empty")) {
                         var hint = document.createElement("div");
@@ -462,13 +469,12 @@ export default apiInitializer((api) => {
                       }
                     });
 
-                    // Update tags via API
+                    // Update tags via API (no reload on failure)
                     ajax("/t/" + topicId + ".json", {
                       type: "PUT",
                       data: { tags: newTags }
-                    }).catch(function() {
-                      // Reload on failure
-                      window.location.reload();
+                    }).catch(function(err) {
+                      console.error("[LMS-Roadmap] Tag update failed:", err);
                     });
                   });
                 });
