@@ -96,6 +96,39 @@
   font-weight: 500;
 }
 
+// === Voting: style .list-vote-count in Horizon card layout ===
+// The native voting plugin renders .list-vote-count inside .discourse-tags
+// Horizon hides votes when vote_count == 0, so we style the plugin's own element
+
+.list-vote-count {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 0.3em;
+  font-size: 0.8em;
+  font-weight: 700;
+  color: var(--tertiary);
+  background: var(--tertiary-very-low, var(--primary-very-low));
+  border: 1px solid var(--tertiary-low, var(--primary-low));
+  padding: 0.15em 0.55em;
+  border-radius: 4px;
+  margin-right: 0.5em;
+  white-space: nowrap;
+
+  &.voted {
+    color: var(--secondary);
+    background: var(--tertiary);
+    border-color: var(--tertiary);
+  }
+}
+
+// Vote button in topic view: larger and more prominent
+.topic-voting .vote-button button,
+#topic-title .vote-button button {
+  padding: 0.5em 1em !important;
+  font-size: 0.95em !important;
+  min-width: 7em;
+}
+
 // Admin toggle checkbox — inline next to category name
 .lms-admin-toggle {
   display: inline-flex;
