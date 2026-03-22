@@ -19,14 +19,6 @@ export default apiInitializer((api) => {
     return false;
   }
 
-  function isRoadmapCategory(categoryId) {
-    var cat = getCategoryById(categoryId);
-    if (!cat) return false;
-    if (cat.roadmap_enabled === true || cat.roadmap_enabled === "true") return true;
-    if (cat.custom_fields?.roadmap_enabled === true || cat.custom_fields?.roadmap_enabled === "true") return true;
-    return false;
-  }
-
   function getCategoryIdFromUrl(url) {
     var pathParts = url.replace(/^\/c\//, "").split("/");
     return parseInt(pathParts[pathParts.length - 1], 10) || 0;
@@ -130,32 +122,21 @@ export default apiInitializer((api) => {
 
   // --- 2. Category Page: Course header + topic badges ---
   api.onPageChange(function(url) {
-    // Always clean up roadmap elements on navigation
-    document.body.classList.remove("roadmap-active");
-    var oldBoard = document.querySelector(".roadmap-board");
-    if (oldBoard) oldBoard.remove();
-
     if (!url.match(/^\/c\//)) return;
 
     var categoryId = getCategoryIdFromUrl(url);
     if (!categoryId) return;
 
-    // Check roadmap IMMEDIATELY (before setTimeout) to prevent flash
-    var isRoadmap = isRoadmapCategory(categoryId);
-    if (isRoadmap) {
-      document.body.classList.add("roadmap-active");
-    }
-
     setTimeout(function() {
       var currentUser = api.getCurrentUser();
       var isAdmin = currentUser && currentUser.admin;
       var isLms = isLmsCategory(categoryId);
+
       var titleEl = document.querySelector(".category-title-contents .category-name, .category-heading");
       if (titleEl && !document.querySelector(".lms-course-header")) {
         var header = document.createElement("div");
         header.className = "lms-course-header";
 
-        // Admin checkboxes (always for admins)
         if (isAdmin) {
           // Kurs checkbox
           var label = document.createElement("label");
@@ -198,48 +179,6 @@ export default apiInitializer((api) => {
                 checkbox.disabled = false;
               });
           });
-
-          // Roadmap checkbox
-          var rmLabel = document.createElement("label");
-          rmLabel.className = "lms-admin-toggle";
-          rmLabel.title = isRoadmap ? "Roadmap-Modus deaktivieren" : "Als Roadmap aktivieren";
-
-          var rmCheckbox = document.createElement("input");
-          rmCheckbox.type = "checkbox";
-          rmCheckbox.checked = isRoadmap;
-          rmCheckbox.className = "lms-admin-checkbox";
-
-          var rmLabelText = document.createElement("span");
-          rmLabelText.className = "lms-admin-label";
-          rmLabelText.textContent = "Roadmap";
-
-          rmLabel.appendChild(rmCheckbox);
-          rmLabel.appendChild(rmLabelText);
-          header.appendChild(rmLabel);
-
-          rmCheckbox.addEventListener("change", function() {
-            rmCheckbox.disabled = true;
-            var newState = rmCheckbox.checked;
-
-            ajax("/categories/" + categoryId + ".json", {
-              type: "PUT",
-              data: { "custom_fields[roadmap_enabled]": newState }
-            })
-              .then(function() {
-                var cat = getCategoryById(categoryId);
-                if (cat) {
-                  if (!cat.custom_fields) cat.custom_fields = {};
-                  cat.custom_fields.roadmap_enabled = newState;
-                }
-                rmCheckbox.disabled = false;
-                rmLabel.title = newState ? "Roadmap-Modus deaktivieren" : "Als Roadmap aktivieren";
-                window.location.reload();
-              })
-              .catch(function() {
-                rmCheckbox.checked = !newState;
-                rmCheckbox.disabled = false;
-              });
-          });
         } else {
           if (isLms) {
             var courseBadge = document.createElement("span");
@@ -247,249 +186,9 @@ export default apiInitializer((api) => {
             courseBadge.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin-right:0.3em"><path d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z"/></svg>Kurs';
             header.appendChild(courseBadge);
           }
-          if (isRoadmap) {
-            var roadmapBadge = document.createElement("span");
-            roadmapBadge.className = "lms-course-badge lms-roadmap-badge";
-            roadmapBadge.textContent = "Roadmap";
-            header.appendChild(roadmapBadge);
-          }
         }
 
         titleEl.after(header);
-      }
-
-      // --- Roadmap: Kanban Board ---
-      if (isRoadmap && !document.querySelector(".roadmap-board")) {
-        var match = url.match(/\/c\/(.+?)(?:\?|$)/);
-        if (match) {
-          var categoryPath = match[1].replace(/\/l\/.*$/, "");
-
-          // Kanban columns: tag → label mapping (order matters)
-          var columns = [
-            { tag: "geplant", label: "Geplant", icon: "📋" },
-            { tag: "in-arbeit", label: "In Arbeit", icon: "🔨" },
-            { tag: "erledigt", label: "Erledigt", icon: "✅" }
-          ];
-          var columnTags = columns.map(function(c) { return c.tag; });
-
-          // Show loading skeleton immediately
-          var courseHeader = document.querySelector(".lms-course-header");
-          var skeleton = document.createElement("div");
-          skeleton.className = "roadmap-board roadmap-board--loading";
-          skeleton.innerHTML = '<div class="roadmap-columns">' +
-            columns.map(function(col) {
-              return '<div class="roadmap-col"><div class="roadmap-col__header">' +
-                '<span class="roadmap-col__icon">' + col.icon + '</span>' +
-                '<span class="roadmap-col__label">' + col.label + '</span>' +
-                '</div><div class="roadmap-col__items">' +
-                '<div class="roadmap-skeleton"></div>' +
-                '<div class="roadmap-skeleton"></div>' +
-                '</div></div>';
-            }).join("") + '</div>';
-          // Insert after nav pills (below breadcrumbs + tabs), fallback to course header
-          var navContainer = document.querySelector(".navigation-container");
-          if (navContainer) {
-            navContainer.after(skeleton);
-          } else if (courseHeader) {
-            courseHeader.after(skeleton);
-          }
-
-          ajax("/c/" + categoryPath + ".json")
-            .then(function(data) {
-              var topics = (data.topic_list && data.topic_list.topics) || [];
-              var displayTopics = topics.filter(function(t) { return !t.pinned; });
-
-              if (displayTopics.length === 0) {
-                skeleton.remove();
-                return;
-              }
-
-              // Fetch vote counts per topic
-              var promises = displayTopics.map(function(t) {
-                return ajax("/t/" + t.id + ".json").then(function(td) {
-                  return {
-                    id: t.id,
-                    slug: t.slug,
-                    fancy_title: t.fancy_title,
-                    tags: t.tags || [],
-                    vote_count: td.vote_count || 0,
-                    excerpt: (t.excerpt || "").replace(/<[^>]*>/g, "").substring(0, 120)
-                  };
-                }).catch(function() {
-                  return {
-                    id: t.id, slug: t.slug, fancy_title: t.fancy_title,
-                    tags: t.tags || [], vote_count: 0, excerpt: ""
-                  };
-                });
-              });
-
-              Promise.all(promises).then(function(items) {
-                // Group by column tag
-                var grouped = {};
-                columns.forEach(function(c) { grouped[c.tag] = []; });
-
-                items.forEach(function(item) {
-                  var placed = false;
-                  for (var i = 0; i < columnTags.length; i++) {
-                    if (item.tags.indexOf(columnTags[i]) !== -1) {
-                      grouped[columnTags[i]].push(item);
-                      placed = true;
-                      break;
-                    }
-                  }
-                  if (!placed) {
-                    grouped[columns[0].tag].push(item);
-                  }
-                });
-
-                // Sort each column by vote_count desc
-                columns.forEach(function(c) {
-                  grouped[c.tag].sort(function(a, b) { return b.vote_count - a.vote_count; });
-                });
-
-                // Build board HTML
-                var html = '<div class="roadmap-columns">';
-                columns.forEach(function(col) {
-                  var colItems = grouped[col.tag];
-                  html += '<div class="roadmap-col" data-column="' + col.tag + '">';
-                  html += '<div class="roadmap-col__header">';
-                  html += '<span class="roadmap-col__icon">' + col.icon + '</span>';
-                  html += '<span class="roadmap-col__label">' + col.label + '</span>';
-                  html += '<span class="roadmap-col__count">' + colItems.length + '</span>';
-                  html += '</div>';
-                  html += '<div class="roadmap-col__items" data-column="' + col.tag + '">';
-
-                  if (colItems.length === 0) {
-                    html += '<div class="roadmap-card --empty --drop-hint">Hierher ziehen</div>';
-                  }
-
-                  colItems.forEach(function(item) {
-                    var allTags = JSON.stringify(item.tags).replace(/"/g, "&quot;");
-                    var dragAttr = isAdmin ? ' draggable="true"' : '';
-                    html += '<a href="/t/' + item.slug + '/' + item.id + '" class="roadmap-card"' + dragAttr + ' data-topic-id="' + item.id + '" data-tags="' + allTags + '">';
-                    html += '<div class="roadmap-card__top">';
-                    html += '<span class="roadmap-card__title">' + item.fancy_title + '</span>';
-                    if (item.vote_count > 0) {
-                      html += '<span class="roadmap-card__votes">▲ ' + item.vote_count + '</span>';
-                    }
-                    html += '</div>';
-                    if (item.excerpt) {
-                      html += '<div class="roadmap-card__excerpt">' + item.excerpt + '</div>';
-                    }
-                    html += '</a>';
-                  });
-
-                  html += '</div></div>';
-                });
-                html += '</div>';
-
-                // Replace skeleton with real board
-                skeleton.classList.remove("roadmap-board--loading");
-                skeleton.innerHTML = html;
-
-                // --- Drag & Drop (admin only) ---
-                if (!isAdmin) return;
-
-                var dragCard = null;
-                var didDrag = false;
-
-                skeleton.querySelectorAll(".roadmap-card[draggable]").forEach(function(card) {
-                  card.addEventListener("dragstart", function(e) {
-                    dragCard = card;
-                    didDrag = true;
-                    card.classList.add("--dragging");
-                    e.dataTransfer.effectAllowed = "move";
-                    e.dataTransfer.setData("text/plain", card.dataset.topicId);
-                  });
-
-                  card.addEventListener("dragend", function() {
-                    card.classList.remove("--dragging");
-                    dragCard = null;
-                    skeleton.querySelectorAll(".roadmap-col__items").forEach(function(col) {
-                      col.classList.remove("--drag-over");
-                    });
-                    // Reset drag flag after a tick so click handler can catch it
-                    setTimeout(function() { didDrag = false; }, 50);
-                  });
-
-                  // Prevent click navigation after drag
-                  card.addEventListener("click", function(e) {
-                    if (didDrag) {
-                      e.preventDefault();
-                      e.stopPropagation();
-                    }
-                  });
-                });
-
-                skeleton.querySelectorAll(".roadmap-col__items").forEach(function(colEl) {
-                  colEl.addEventListener("dragover", function(e) {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = "move";
-                    colEl.classList.add("--drag-over");
-                  });
-
-                  colEl.addEventListener("dragleave", function(e) {
-                    if (!colEl.contains(e.relatedTarget)) {
-                      colEl.classList.remove("--drag-over");
-                    }
-                  });
-
-                  colEl.addEventListener("drop", function(e) {
-                    e.preventDefault();
-                    e.stopImmediatePropagation();
-                    colEl.classList.remove("--drag-over");
-                    if (!dragCard) return;
-
-                    var newColumn = colEl.dataset.column;
-                    var topicId = dragCard.dataset.topicId;
-                    var currentTags = JSON.parse(dragCard.dataset.tags.replace(/&quot;/g, '"'));
-
-                    // Skip if dropped in same column
-                    var oldColumn = null;
-                    for (var i = 0; i < columnTags.length; i++) {
-                      if (currentTags.indexOf(columnTags[i]) !== -1) { oldColumn = columnTags[i]; break; }
-                    }
-                    if (oldColumn === newColumn) return;
-
-                    // Remove old column tags, add new one
-                    var newTags = currentTags.filter(function(t) {
-                      return columnTags.indexOf(t) === -1;
-                    });
-                    newTags.push(newColumn);
-
-                    // Move card visually
-                    var emptyCard = colEl.querySelector(".--empty");
-                    if (emptyCard) emptyCard.remove();
-                    colEl.appendChild(dragCard);
-                    dragCard.dataset.tags = JSON.stringify(newTags).replace(/"/g, "&quot;");
-
-                    // Update counts
-                    skeleton.querySelectorAll(".roadmap-col").forEach(function(col) {
-                      var count = col.querySelectorAll(".roadmap-card[draggable]").length;
-                      var countEl = col.querySelector(".roadmap-col__count");
-                      if (countEl) countEl.textContent = count;
-                      var itemsEl = col.querySelector(".roadmap-col__items");
-                      if (count === 0 && !itemsEl.querySelector(".--empty")) {
-                        var hint = document.createElement("div");
-                        hint.className = "roadmap-card --empty --drop-hint";
-                        hint.textContent = "Hierher ziehen";
-                        itemsEl.appendChild(hint);
-                      }
-                    });
-
-                    // Update tags via API (no reload on failure)
-                    ajax("/t/" + topicId + ".json", {
-                      type: "PUT",
-                      data: { tags: newTags }
-                    }).catch(function(err) {
-                      console.error("[LMS-Roadmap] Tag update failed:", err);
-                    });
-                  });
-                });
-              });
-            })
-            .catch(function() { skeleton.remove(); });
-        }
       }
 
       if (!isLms) return;
