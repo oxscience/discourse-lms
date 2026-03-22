@@ -147,28 +147,29 @@
 }
 
 .list-vote-count {
-  display: inline-flex !important;
-  align-items: center;
-  gap: 0.3em;
-  font-size: 0.8em;
-  font-weight: 700;
-  color: var(--tertiary);
-  background: var(--tertiary-very-low, var(--primary-very-low));
-  border: 1px solid var(--tertiary-low, var(--primary-low));
-  padding: 0.2em 0.6em;
-  border-radius: 4px;
+  display: inline !important;
+  font-size: 0.8rem !important;
+  color: var(--primary-medium) !important;
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+  text-decoration: none !important;
   white-space: nowrap;
-  text-decoration: none;
+  font-weight: normal;
 
-  &.voted {
-    color: var(--secondary);
-    background: var(--tertiary);
-    border-color: var(--tertiary);
+  // Bold when at least 1 vote
+  &:not(.vote-count-0) {
+    font-weight: 700;
+    color: var(--primary-high) !important;
   }
 
   &:hover {
-    opacity: 0.85;
+    color: var(--tertiary) !important;
   }
+
+  // Add parentheses with leading space via CSS
+  &::before { content: " ("; white-space: pre; }
+  &::after { content: ")"; }
 }
 
 // Hide category/poster/time row in roadmap voting category
