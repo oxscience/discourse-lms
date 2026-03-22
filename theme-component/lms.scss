@@ -131,11 +131,15 @@
   border: 1px solid var(--tertiary-low, var(--primary-low));
 }
 
-// === Roadmap: instant hide topic list & nav ===
+// === Roadmap: instant hide topic list (keep breadcrumbs!) ===
 body.roadmap-active {
   .topic-list,
-  .latest-topic-list,
-  .navigation-container {
+  .latest-topic-list {
+    display: none !important;
+  }
+
+  // Hide only the nav pills (Aktuell/Stimmen tabs), not breadcrumbs
+  .navigation-container .nav-pills {
     display: none !important;
   }
 }

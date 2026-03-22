@@ -357,7 +357,8 @@ export default apiInitializer((api) => {
 
                   colItems.forEach(function(item) {
                     var allTags = JSON.stringify(item.tags).replace(/"/g, "&quot;");
-                    html += '<a href="/t/' + item.slug + '/' + item.id + '" class="roadmap-card" draggable="true" data-topic-id="' + item.id + '" data-tags="' + allTags + '">';
+                    var dragAttr = isAdmin ? ' draggable="true"' : '';
+                    html += '<a href="/t/' + item.slug + '/' + item.id + '" class="roadmap-card"' + dragAttr + ' data-topic-id="' + item.id + '" data-tags="' + allTags + '">';
                     html += '<div class="roadmap-card__top">';
                     html += '<span class="roadmap-card__title">' + item.fancy_title + '</span>';
                     if (item.vote_count > 0) {
