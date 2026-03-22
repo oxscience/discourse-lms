@@ -290,9 +290,16 @@ export default apiInitializer((api) => {
               html += '</ul>';
               overview.innerHTML = html;
 
-              var container = document.querySelector(".topic-list, .topic-list-container");
-              if (container && container.parentElement) {
-                container.parentElement.insertBefore(overview, container);
+              // Insert after course header, or before topic list, or at end of main outlet
+              var courseHeader = document.querySelector(".lms-course-header");
+              var topicList = document.querySelector(".topic-list, .topic-list-container, .latest-topic-list, [class*='topic-list']");
+              if (courseHeader) {
+                courseHeader.after(overview);
+              } else if (topicList && topicList.parentElement) {
+                topicList.parentElement.insertBefore(overview, topicList);
+              } else {
+                var mainOutlet = document.querySelector("#main-outlet .regular, #main-outlet");
+                if (mainOutlet) mainOutlet.appendChild(overview);
               }
             })
             .catch(function() {});
