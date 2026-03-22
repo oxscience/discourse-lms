@@ -252,6 +252,47 @@
   overflow: hidden;
 }
 
+// === Loading skeleton ===
+.roadmap-skeleton {
+  height: 60px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--primary-very-low) 25%, var(--primary-low) 50%, var(--primary-very-low) 75%);
+  background-size: 200% 100%;
+  animation: roadmap-shimmer 1.5s ease infinite;
+}
+
+@keyframes roadmap-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+// === Drag & Drop ===
+.roadmap-card.--dragging {
+  opacity: 0.4;
+  transform: rotate(2deg);
+}
+
+.roadmap-col__items.--drag-over {
+  background: var(--tertiary-very-low, rgba(0, 0, 0, 0.03));
+  border-radius: 6px;
+  outline: 2px dashed var(--tertiary);
+  outline-offset: -2px;
+  min-height: 60px;
+}
+
+.roadmap-card.--drop-hint {
+  border-color: transparent;
+  background: transparent;
+}
+
+.roadmap-card[draggable="true"] {
+  cursor: grab;
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
 // === Vote button fix (larger in topic view) ===
 .topic-voting .vote-button button,
 #topic-title .vote-button button {

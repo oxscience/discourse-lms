@@ -252,6 +252,12 @@ export default apiInitializer((api) => {
 
       // --- Roadmap: Kanban Board ---
       if (isRoadmap && !document.querySelector(".roadmap-board")) {
+        // IMMEDIATELY hide topic list & nav to prevent flash
+        var topicList = document.querySelector(".topic-list, .latest-topic-list");
+        if (topicList) topicList.style.display = "none";
+        var navPills = document.querySelector(".navigation-container");
+        if (navPills) navPills.style.display = "none";
+
         var match = url.match(/\/c\/(.+?)(?:\?|$)/);
         if (match) {
           var categoryPath = match[1].replace(/\/l\/.*$/, "");
@@ -264,12 +270,31 @@ export default apiInitializer((api) => {
           ];
           var columnTags = columns.map(function(c) { return c.tag; });
 
+          // Show loading skeleton immediately
+          var courseHeader = document.querySelector(".lms-course-header");
+          var skeleton = document.createElement("div");
+          skeleton.className = "roadmap-board roadmap-board--loading";
+          skeleton.innerHTML = '<div class="roadmap-columns">' +
+            columns.map(function(col) {
+              return '<div class="roadmap-col"><div class="roadmap-col__header">' +
+                '<span class="roadmap-col__icon">' + col.icon + '</span>' +
+                '<span class="roadmap-col__label">' + col.label + '</span>' +
+                '</div><div class="roadmap-col__items">' +
+                '<div class="roadmap-skeleton"></div>' +
+                '<div class="roadmap-skeleton"></div>' +
+                '</div></div>';
+            }).join("") + '</div>';
+          if (courseHeader) courseHeader.after(skeleton);
+
           ajax("/c/" + categoryPath + ".json")
             .then(function(data) {
-              if (document.querySelector(".roadmap-board")) return;
               var topics = (data.topic_list && data.topic_list.topics) || [];
               var displayTopics = topics.filter(function(t) { return !t.pinned; });
-              if (displayTopics.length === 0) return;
+
+              if (displayTopics.length === 0) {
+                skeleton.remove();
+                return;
+              }
 
               // Fetch vote counts per topic
               var promises = displayTopics.map(function(t) {
@@ -291,9 +316,7 @@ export default apiInitializer((api) => {
               });
 
               Promise.all(promises).then(function(items) {
-                if (document.querySelector(".roadmap-board")) return;
-
-                // Group by column tag (first matching tag wins, untagged → first column)
+                // Group by column tag
                 var grouped = {};
                 columns.forEach(function(c) { grouped[c.tag] = []; });
 
@@ -316,26 +339,25 @@ export default apiInitializer((api) => {
                   grouped[c.tag].sort(function(a, b) { return b.vote_count - a.vote_count; });
                 });
 
-                var board = document.createElement("div");
-                board.className = "roadmap-board";
-
+                // Build board HTML
                 var html = '<div class="roadmap-columns">';
                 columns.forEach(function(col) {
-                  var items = grouped[col.tag];
-                  html += '<div class="roadmap-col">';
+                  var colItems = grouped[col.tag];
+                  html += '<div class="roadmap-col" data-column="' + col.tag + '">';
                   html += '<div class="roadmap-col__header">';
                   html += '<span class="roadmap-col__icon">' + col.icon + '</span>';
                   html += '<span class="roadmap-col__label">' + col.label + '</span>';
-                  html += '<span class="roadmap-col__count">' + items.length + '</span>';
+                  html += '<span class="roadmap-col__count">' + colItems.length + '</span>';
                   html += '</div>';
-                  html += '<div class="roadmap-col__items">';
+                  html += '<div class="roadmap-col__items" data-column="' + col.tag + '">';
 
-                  if (items.length === 0) {
-                    html += '<div class="roadmap-card --empty">Keine Einträge</div>';
+                  if (colItems.length === 0) {
+                    html += '<div class="roadmap-card --empty --drop-hint">Hierher ziehen</div>';
                   }
 
-                  items.forEach(function(item) {
-                    html += '<a href="/t/' + item.slug + '/' + item.id + '" class="roadmap-card">';
+                  colItems.forEach(function(item) {
+                    var allTags = JSON.stringify(item.tags).replace(/"/g, "&quot;");
+                    html += '<a href="/t/' + item.slug + '/' + item.id + '" class="roadmap-card" draggable="true" data-topic-id="' + item.id + '" data-tags="' + allTags + '">';
                     html += '<div class="roadmap-card__top">';
                     html += '<span class="roadmap-card__title">' + item.fancy_title + '</span>';
                     if (item.vote_count > 0) {
@@ -352,21 +374,106 @@ export default apiInitializer((api) => {
                 });
                 html += '</div>';
 
-                board.innerHTML = html;
+                // Replace skeleton with real board
+                skeleton.classList.remove("roadmap-board--loading");
+                skeleton.innerHTML = html;
 
-                // Hide the default topic list when roadmap board is shown
-                var topicList = document.querySelector(".topic-list, .latest-topic-list");
-                if (topicList) topicList.style.display = "none";
-                var navPills = document.querySelector(".navigation-container");
-                if (navPills) navPills.style.display = "none";
+                // --- Drag & Drop ---
+                if (!isAdmin) return; // Only admins can drag
 
-                var courseHeader = document.querySelector(".lms-course-header");
-                if (courseHeader) {
-                  courseHeader.after(board);
-                }
+                var dragCard = null;
+
+                skeleton.querySelectorAll(".roadmap-card[draggable]").forEach(function(card) {
+                  card.addEventListener("dragstart", function(e) {
+                    dragCard = card;
+                    card.classList.add("--dragging");
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData("text/plain", card.dataset.topicId);
+                    // Prevent navigation on drag
+                    e.stopPropagation();
+                  });
+
+                  card.addEventListener("dragend", function() {
+                    card.classList.remove("--dragging");
+                    dragCard = null;
+                    skeleton.querySelectorAll(".roadmap-col__items").forEach(function(col) {
+                      col.classList.remove("--drag-over");
+                    });
+                  });
+
+                  // Prevent click navigation during drag
+                  card.addEventListener("click", function(e) {
+                    if (card.classList.contains("--was-dragged")) {
+                      e.preventDefault();
+                      card.classList.remove("--was-dragged");
+                    }
+                  });
+                });
+
+                skeleton.querySelectorAll(".roadmap-col__items").forEach(function(colEl) {
+                  colEl.addEventListener("dragover", function(e) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    colEl.classList.add("--drag-over");
+                  });
+
+                  colEl.addEventListener("dragleave", function(e) {
+                    if (!colEl.contains(e.relatedTarget)) {
+                      colEl.classList.remove("--drag-over");
+                    }
+                  });
+
+                  colEl.addEventListener("drop", function(e) {
+                    e.preventDefault();
+                    colEl.classList.remove("--drag-over");
+                    if (!dragCard) return;
+
+                    var newColumn = colEl.dataset.column;
+                    var topicId = dragCard.dataset.topicId;
+                    var currentTags = JSON.parse(dragCard.dataset.tags.replace(/&quot;/g, '"'));
+
+                    // Remove old column tags, add new one
+                    var newTags = currentTags.filter(function(t) {
+                      return columnTags.indexOf(t) === -1;
+                    });
+                    newTags.push(newColumn);
+
+                    // Move card visually
+                    var emptyCard = colEl.querySelector(".--empty");
+                    if (emptyCard) emptyCard.remove();
+                    colEl.appendChild(dragCard);
+                    dragCard.dataset.tags = JSON.stringify(newTags);
+                    dragCard.classList.add("--was-dragged");
+
+                    // Update counts
+                    skeleton.querySelectorAll(".roadmap-col").forEach(function(col) {
+                      var tag = col.dataset.column;
+                      var count = col.querySelectorAll(".roadmap-card[draggable]").length;
+                      var countEl = col.querySelector(".roadmap-col__count");
+                      if (countEl) countEl.textContent = count;
+                      // Show empty hint if column is empty
+                      var itemsEl = col.querySelector(".roadmap-col__items");
+                      if (count === 0 && !itemsEl.querySelector(".--empty")) {
+                        var hint = document.createElement("div");
+                        hint.className = "roadmap-card --empty --drop-hint";
+                        hint.textContent = "Hierher ziehen";
+                        itemsEl.appendChild(hint);
+                      }
+                    });
+
+                    // Update tags via API
+                    ajax("/t/" + topicId + ".json", {
+                      type: "PUT",
+                      data: { tags: newTags }
+                    }).catch(function() {
+                      // Reload on failure
+                      window.location.reload();
+                    });
+                  });
+                });
               });
             })
-            .catch(function() {});
+            .catch(function() { skeleton.remove(); });
         }
       }
 
