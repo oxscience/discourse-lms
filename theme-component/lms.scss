@@ -102,12 +102,23 @@
 
 .topic-list.--d-topic-cards .topic-list-item .link-bottom-line {
   display: flex !important;
+  align-items: center;
+  gap: 0.4em;
 
   // Un-hide .discourse-tags (Horizon hides it)
   .discourse-tags {
-    display: flex !important;
+    display: inline-flex !important;
+    align-items: center;
+    flex-wrap: nowrap !important;
+    gap: 0.4em;
     // Hide comma separators between tags
     font-size: 0 !important;
+
+    li {
+      display: inline-flex !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
   }
 
   // Hide regular tags, but show vote counts + status tags
