@@ -122,6 +122,10 @@ export default apiInitializer((api) => {
 
   // --- 2. Category Page: Course header + topic badges ---
   api.onPageChange(function(url) {
+    // Clean up old LMS elements from previous category page
+    document.querySelectorAll(".lms-course-header, .lms-progress-bar").forEach(function(el) { el.remove(); });
+    document.querySelectorAll(".lms-position, .lms-status-badge").forEach(function(el) { el.remove(); });
+
     if (!url.match(/^\/c\//)) return;
 
     var categoryId = getCategoryIdFromUrl(url);
@@ -232,10 +236,14 @@ export default apiInitializer((api) => {
               if (!lesson) return;
 
               if (lesson.position > 0 && !row.querySelector(".lms-position")) {
-                var posEl = document.createElement("span");
-                posEl.className = "lms-position";
-                posEl.textContent = lesson.position + ". ";
-                link.prepend(posEl);
+                // Skip visual numbering if title already starts with a number (e.g. "1.1 Pacing...")
+                var titleStartsWithNumber = /^\d/.test(lesson.title);
+                if (!titleStartsWithNumber) {
+                  var posEl = document.createElement("span");
+                  posEl.className = "lms-position";
+                  posEl.textContent = lesson.position + ". ";
+                  link.prepend(posEl);
+                }
               }
 
               if (!row.querySelector(".lms-status-badge")) {
