@@ -193,6 +193,7 @@ after_initialize do
         post_number: 1,
         data: {
           topic_title: topic.title,
+          display_username: post.user&.username || "system",
           message: "discourse_lms.notifications.lesson_updated"
         }.to_json
       )
