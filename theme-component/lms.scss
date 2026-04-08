@@ -284,3 +284,32 @@
     }
   }
 }
+
+// Reorder buttons (manual sort, admin only)
+.lms-reorder-btns {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-right: 6px;
+  vertical-align: middle;
+
+  .lms-reorder-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 16px;
+    padding: 0;
+    border: none;
+    border-radius: 3px;
+    background: var(--primary-low);
+    color: var(--primary-medium);
+    cursor: pointer;
+    transition: background 0.12s;
+
+    &:hover {
+      background: var(--primary-low-mid);
+      color: var(--primary);
+    }
+  }
+}

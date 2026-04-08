@@ -311,7 +311,34 @@ export default apiInitializer((api) => {
               }
             }
 
-            // Now add numbering and badges to the reordered rows
+            // Helper: save positions to server and reload
+            function savePositions(orderedTopicIds) {
+              var positions = {};
+              orderedTopicIds.forEach(function(id, idx) {
+                positions[id] = idx + 1;
+              });
+              ajax("/lms/reorder/" + categoryId, {
+                type: "PUT",
+                data: { positions: positions }
+              }).then(function() {
+                window.location.reload();
+              });
+            }
+
+            // Helper: move a topic up or down in the list
+            function moveRow(topicId, direction) {
+              var idx = orderedIds.indexOf(topicId);
+              if (idx < 0) return;
+              var newIdx = idx + direction;
+              if (newIdx < 0 || newIdx >= orderedIds.length) return;
+              // Swap
+              var tmp = orderedIds[newIdx];
+              orderedIds[newIdx] = orderedIds[idx];
+              orderedIds[idx] = tmp;
+              savePositions(orderedIds);
+            }
+
+            // Now add numbering, badges, and reorder buttons to the reordered rows
             Object.keys(rowById).forEach(function(topicIdStr) {
               var topicId = parseInt(topicIdStr, 10);
               var row = rowById[topicId];
@@ -331,6 +358,28 @@ export default apiInitializer((api) => {
                   posEl.textContent = num + ". ";
                   link.prepend(posEl);
                 }
+              }
+
+              // Reorder buttons (admin only, manual sort only)
+              if (isAdmin && sortOrder === "manual" && !row.querySelector(".lms-reorder-btns")) {
+                var reorderWrap = document.createElement("span");
+                reorderWrap.className = "lms-reorder-btns";
+
+                var upBtn = document.createElement("button");
+                upBtn.className = "lms-reorder-btn";
+                upBtn.title = "Nach oben";
+                upBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 14l5-5 5 5H7z"/></svg>';
+                upBtn.addEventListener("click", function(e) { e.preventDefault(); e.stopPropagation(); moveRow(topicId, -1); });
+
+                var downBtn = document.createElement("button");
+                downBtn.className = "lms-reorder-btn";
+                downBtn.title = "Nach unten";
+                downBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5H7z"/></svg>';
+                downBtn.addEventListener("click", function(e) { e.preventDefault(); e.stopPropagation(); moveRow(topicId, 1); });
+
+                reorderWrap.appendChild(upBtn);
+                reorderWrap.appendChild(downBtn);
+                link.parentNode.insertBefore(reorderWrap, link);
               }
 
               if (!row.querySelector(".lms-status-badge")) {
