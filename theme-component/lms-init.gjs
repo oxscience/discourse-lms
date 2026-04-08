@@ -264,14 +264,20 @@ export default apiInitializer((api) => {
           .catch(function() {});
       }
 
-      // Topic list: badges and auto-numbering
+      // Topic list: reorder DOM rows to match LMS sort, then add badges and auto-numbering
       if (currentUser) {
         ajax("/lms/lessons/" + categoryId + ".json")
           .then(function(data) {
             var lessons = data.lessons || [];
 
-            // Build auto-number map: assign sequential display numbers
-            // based on list order (from backend sort), skipping "Über" topics
+            // Build ordered topic ID list and lookup maps
+            var orderedIds = lessons.map(function(l) { return l.id; });
+            var byId = {};
+            for (var i = 0; i < lessons.length; i++) {
+              byId[lessons[i].id] = lessons[i];
+            }
+
+            // Build auto-number map: sequential display numbers, skip "Über" topics
             var displayNum = {};
             var counter = 1;
             for (var i = 0; i < lessons.length; i++) {
@@ -282,23 +288,38 @@ export default apiInitializer((api) => {
               }
             }
 
-            var byId = {};
-            for (var i = 0; i < lessons.length; i++) {
-              byId[lessons[i].id] = lessons[i];
-            }
-
+            // Collect all topic rows and map them by topic ID
             var rows = document.querySelectorAll("tr.topic-list-item, .topic-list-item");
+            var rowById = {};
             rows.forEach(function(row) {
               var link = row.querySelector("a.title.raw-link, a.raw-topic-link");
               if (!link) return;
-
               var href = link.getAttribute("href") || "";
               var match = href.match(/\/t\/[^/]+\/(\d+)/);
               if (!match) return;
+              rowById[parseInt(match[1], 10)] = row;
+            });
 
-              var topicId = parseInt(match[1], 10);
+            // Reorder DOM rows to match LMS lesson order
+            if (rows.length > 0) {
+              var parent = rows[0].parentNode;
+              if (parent) {
+                orderedIds.forEach(function(id) {
+                  var row = rowById[id];
+                  if (row) parent.appendChild(row);
+                });
+              }
+            }
+
+            // Now add numbering and badges to the reordered rows
+            Object.keys(rowById).forEach(function(topicIdStr) {
+              var topicId = parseInt(topicIdStr, 10);
+              var row = rowById[topicId];
               var lesson = byId[topicId];
-              if (!lesson) return;
+              if (!row || !lesson) return;
+
+              var link = row.querySelector("a.title.raw-link, a.raw-topic-link");
+              if (!link) return;
 
               // Auto-numbering: show display number unless title already starts with a number
               var num = displayNum[topicId];
