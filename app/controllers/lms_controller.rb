@@ -80,14 +80,20 @@ module DiscourseLms
 
     # GET /lms/lessons/:category_id
     # Returns ordered list of lessons in a course category with completion status
+    # Sort order is determined by category custom field lms_sort_order:
+    #   "created" (default) — by topic creation date
+    #   "title"  — alphabetically by title
+    #   "manual" — by lms_position custom field
     def category_lessons
       category = Category.find(params[:category_id])
       raise Discourse::InvalidAccess unless category.custom_fields["lms_enabled"]
 
+      sort_order = category.custom_fields["lms_sort_order"].presence || "created"
+
       topics = Topic.where(category_id: category.id)
                     .where(archetype: Archetype.default)
                     .where(deleted_at: nil)
-                    .select(:id, :title, :slug)
+                    .select(:id, :title, :slug, :created_at)
 
       lessons = topics.map do |t|
         pos = t.custom_fields["lms_position"]
@@ -97,14 +103,22 @@ module DiscourseLms
           title: t.title,
           slug: t.slug,
           position: pos.to_i,
+          created_at: t.created_at.iso8601,
           completed: data.present?,
           needs_review: data.is_a?(Hash) && data["needs_review"] == true
         }
       end
 
-      lessons.sort_by! { |l| l[:position] }
+      case sort_order
+      when "title"
+        lessons.sort_by! { |l| l[:title].downcase }
+      when "manual"
+        lessons.sort_by! { |l| [l[:position], l[:created_at]] }
+      else # "created"
+        lessons.sort_by! { |l| l[:created_at] }
+      end
 
-      render json: { category_id: category.id, lessons: lessons }
+      render json: { category_id: category.id, sort_order: sort_order, lessons: lessons }
     end
 
     # PUT /lms/reorder/:category_id

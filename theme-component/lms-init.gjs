@@ -136,6 +136,10 @@ export default apiInitializer((api) => {
       var isAdmin = currentUser && currentUser.admin;
       var isLms = isLmsCategory(categoryId);
 
+      // Read current sort order from category data
+      var cat = getCategoryById(categoryId);
+      var sortOrder = cat?.lms_sort_order || cat?.custom_fields?.lms_sort_order || "created";
+
       var titleEl = document.querySelector(".category-title-contents .category-name, .category-heading");
       if (titleEl && !document.querySelector(".lms-course-header")) {
         var header = document.createElement("div");
@@ -183,6 +187,54 @@ export default apiInitializer((api) => {
                 checkbox.disabled = false;
               });
           });
+
+          // Sort order dropdown (only visible when Kurs is active)
+          if (isLms) {
+            var sortWrapper = document.createElement("div");
+            sortWrapper.className = "lms-sort-wrapper";
+
+            var sortLabel = document.createElement("span");
+            sortLabel.className = "lms-sort-label";
+            sortLabel.textContent = "Sortierung:";
+            sortWrapper.appendChild(sortLabel);
+
+            var select = document.createElement("select");
+            select.className = "lms-sort-select";
+            var options = [
+              { value: "created", text: "Erstelldatum" },
+              { value: "title", text: "Titel (A-Z)" },
+              { value: "manual", text: "Manuell" }
+            ];
+            options.forEach(function(opt) {
+              var option = document.createElement("option");
+              option.value = opt.value;
+              option.textContent = opt.text;
+              if (opt.value === sortOrder) option.selected = true;
+              select.appendChild(option);
+            });
+            sortWrapper.appendChild(select);
+            header.appendChild(sortWrapper);
+
+            select.addEventListener("change", function() {
+              select.disabled = true;
+              ajax("/categories/" + categoryId + ".json", {
+                type: "PUT",
+                data: { "custom_fields[lms_sort_order]": select.value }
+              })
+                .then(function() {
+                  var cat = getCategoryById(categoryId);
+                  if (cat) {
+                    if (!cat.custom_fields) cat.custom_fields = {};
+                    cat.custom_fields.lms_sort_order = select.value;
+                    cat.lms_sort_order = select.value;
+                  }
+                  window.location.reload();
+                })
+                .catch(function() {
+                  select.disabled = false;
+                });
+            });
+          }
         } else {
           if (isLms) {
             var courseBadge = document.createElement("span");
@@ -212,11 +264,24 @@ export default apiInitializer((api) => {
           .catch(function() {});
       }
 
-      // Topic list: badges and position numbers
+      // Topic list: badges and auto-numbering
       if (currentUser) {
         ajax("/lms/lessons/" + categoryId + ".json")
           .then(function(data) {
             var lessons = data.lessons || [];
+
+            // Build auto-number map: assign sequential display numbers
+            // based on list order (from backend sort), skipping "Über" topics
+            var displayNum = {};
+            var counter = 1;
+            for (var i = 0; i < lessons.length; i++) {
+              var isAboutTopic = /^[Üü]ber die Kategorie/i.test(lessons[i].title);
+              if (!isAboutTopic) {
+                displayNum[lessons[i].id] = counter;
+                counter++;
+              }
+            }
+
             var byId = {};
             for (var i = 0; i < lessons.length; i++) {
               byId[lessons[i].id] = lessons[i];
@@ -235,13 +300,14 @@ export default apiInitializer((api) => {
               var lesson = byId[topicId];
               if (!lesson) return;
 
-              if (lesson.position > 0 && !row.querySelector(".lms-position")) {
-                // Skip visual numbering if title already starts with a number (e.g. "1.1 Pacing...")
+              // Auto-numbering: show display number unless title already starts with a number
+              var num = displayNum[topicId];
+              if (num && !row.querySelector(".lms-position")) {
                 var titleStartsWithNumber = /^\d/.test(lesson.title);
                 if (!titleStartsWithNumber) {
                   var posEl = document.createElement("span");
                   posEl.className = "lms-position";
-                  posEl.textContent = lesson.position + ". ";
+                  posEl.textContent = num + ". ";
                   link.prepend(posEl);
                 }
               }

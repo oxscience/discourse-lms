@@ -25,6 +25,10 @@ after_initialize do
   Site.preloaded_category_custom_fields << "lms_enabled"
   register_category_custom_field_type("lms_enabled", :boolean)
 
+  # Category: sort order for lessons (created, title, manual)
+  Site.preloaded_category_custom_fields << "lms_sort_order"
+  register_category_custom_field_type("lms_sort_order", :string)
+
   # Category: is this a Roadmap (voting overview)?
   Site.preloaded_category_custom_fields << "roadmap_enabled"
   register_category_custom_field_type("roadmap_enabled", :boolean)
@@ -72,6 +76,15 @@ after_initialize do
   end
 
   add_to_serializer(:basic_category, :include_lms_enabled?) do
+    SiteSetting.lms_enabled
+  end
+
+  # Expose lms_sort_order on categories (default: "created")
+  add_to_serializer(:basic_category, :lms_sort_order) do
+    object.custom_fields["lms_sort_order"].presence || "created"
+  end
+
+  add_to_serializer(:basic_category, :include_lms_sort_order?) do
     SiteSetting.lms_enabled
   end
 

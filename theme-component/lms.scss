@@ -254,3 +254,33 @@
     cursor: pointer;
   }
 }
+
+// Sort order dropdown for admins
+.lms-sort-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  margin-left: 0.6em;
+  font-size: 0.7em;
+  vertical-align: middle;
+
+  .lms-sort-label {
+    color: var(--primary-medium);
+    font-weight: 500;
+  }
+
+  .lms-sort-select {
+    font-size: 1em;
+    padding: 0.15em 0.4em;
+    border-radius: 3px;
+    border: 1px solid var(--primary-low);
+    background: var(--secondary);
+    color: var(--primary);
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: wait;
+    }
+  }
+}
