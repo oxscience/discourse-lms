@@ -70,10 +70,10 @@ Alle unter `/lms/` gemountet, erfordern Login.
 ```bash
 # Per Admin API deployen (kein Rebuild nötig):
 curl -X PUT \
-  -H "Api-Key: $API_KEY" -H "Api-Username: Pat" \
+  -H "Api-Key: $API_KEY" -H "Api-Username: $API_USER" \
   -H "Content-Type: application/json" \
   -d '{"theme": {"theme_fields": [...]}}' \
-  "https://campus.outoftheb-ox.de/admin/themes/6.json"
+  "https://<your-discourse>/admin/themes/<theme-id>.json"
 ```
 
 ### Backend-Plugin (Ruby) — erfordert Rebuild
@@ -83,7 +83,7 @@ curl -X PUT \
 git add . && git commit -m "..." && git push
 
 # 2. Auf dem Server: Rebuild (5-10 Min, Forum offline)
-ssh root@46.224.200.248
+ssh root@<server-ip>
 cd /var/discourse && ./launcher rebuild app
 ```
 
@@ -96,10 +96,12 @@ cd /var/discourse && ./launcher rebuild app
 | `lms_completion_button_text_complete` | "Als abgeschlossen markieren" | Button-Text |
 | `lms_completion_button_text_undo` | "Abschluss aufheben" | Button-Text (Undo) |
 
-## Aktive Kurse auf campus.outoftheb-ox.de
+## Beispiel-Setup
 
-| Kategorie | ID | Topics | Sortierung |
-|-----------|-----|--------|------------|
-| Symposien (Training & Therapie) | 18 | 27 | Erstelldatum (Titel haben eigene Nummern) |
-| Pain & Performance | 19 | 10 | Erstelldatum |
-| Prävention & Training | 6 | 26 | Erstelldatum |
+Das Plugin unterstützt mehrere Kurse parallel mit unterschiedlichen Sortierungen:
+
+| Kategorie | Topics | Sortierung |
+|-----------|--------|------------|
+| Symposien-Reihe | 27 | Erstelldatum (Titel haben eigene Nummern → Smart-Skip) |
+| Seminar-Reihe A | 10 | Erstelldatum |
+| Seminar-Reihe B | 26 | Erstelldatum |
