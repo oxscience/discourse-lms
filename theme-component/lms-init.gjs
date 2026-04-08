@@ -325,20 +325,19 @@ export default apiInitializer((api) => {
               });
             }
 
-            // Helper: move a topic up or down in the list
-            function moveRow(topicId, direction) {
-              var idx = orderedIds.indexOf(topicId);
-              if (idx < 0) return;
-              var newIdx = idx + direction;
-              if (newIdx < 0 || newIdx >= orderedIds.length) return;
-              // Swap
-              var tmp = orderedIds[newIdx];
-              orderedIds[newIdx] = orderedIds[idx];
-              orderedIds[idx] = tmp;
+            // Helper: move a topic to a specific position
+            function moveToPosition(topicId, newPos) {
+              newPos = Math.max(1, Math.min(orderedIds.length, newPos));
+              var oldIdx = orderedIds.indexOf(topicId);
+              if (oldIdx < 0) return;
+              // Remove from old position
+              orderedIds.splice(oldIdx, 1);
+              // Insert at new position (1-based → 0-based)
+              orderedIds.splice(newPos - 1, 0, topicId);
               savePositions(orderedIds);
             }
 
-            // Now add numbering, badges, and reorder buttons to the reordered rows
+            // Now add numbering, badges, and position inputs to the reordered rows
             Object.keys(rowById).forEach(function(topicIdStr) {
               var topicId = parseInt(topicIdStr, 10);
               var row = rowById[topicId];
@@ -350,36 +349,44 @@ export default apiInitializer((api) => {
 
               // Auto-numbering: show display number unless title already starts with a number
               var num = displayNum[topicId];
-              if (num && !row.querySelector(".lms-position")) {
+              if (num && !row.querySelector(".lms-position") && !row.querySelector(".lms-position-input")) {
                 var titleStartsWithNumber = /^\d/.test(lesson.title);
                 if (!titleStartsWithNumber) {
-                  var posEl = document.createElement("span");
-                  posEl.className = "lms-position";
-                  posEl.textContent = num + ". ";
-                  link.prepend(posEl);
+                  // Admin + manual sort → editable number input
+                  if (isAdmin && sortOrder === "manual") {
+                    var input = document.createElement("input");
+                    input.type = "number";
+                    input.className = "lms-position-input";
+                    input.value = num;
+                    input.min = 1;
+                    input.max = orderedIds.length;
+                    input.title = "Position eingeben + Enter";
+                    input.addEventListener("keydown", function(e) {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        var newPos = parseInt(input.value, 10);
+                        if (newPos && newPos !== num) {
+                          input.disabled = true;
+                          moveToPosition(topicId, newPos);
+                        }
+                      }
+                    });
+                    input.addEventListener("blur", function() {
+                      var newPos = parseInt(input.value, 10);
+                      if (newPos && newPos !== num) {
+                        input.disabled = true;
+                        moveToPosition(topicId, newPos);
+                      }
+                    });
+                    link.parentNode.insertBefore(input, link);
+                  } else {
+                    // Normal display number
+                    var posEl = document.createElement("span");
+                    posEl.className = "lms-position";
+                    posEl.textContent = num + ". ";
+                    link.prepend(posEl);
+                  }
                 }
-              }
-
-              // Reorder buttons (admin only, manual sort only)
-              if (isAdmin && sortOrder === "manual" && !row.querySelector(".lms-reorder-btns")) {
-                var reorderWrap = document.createElement("span");
-                reorderWrap.className = "lms-reorder-btns";
-
-                var upBtn = document.createElement("button");
-                upBtn.className = "lms-reorder-btn";
-                upBtn.title = "Nach oben";
-                upBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 14l5-5 5 5H7z"/></svg>';
-                upBtn.addEventListener("click", function(e) { e.preventDefault(); e.stopPropagation(); moveRow(topicId, -1); });
-
-                var downBtn = document.createElement("button");
-                downBtn.className = "lms-reorder-btn";
-                downBtn.title = "Nach unten";
-                downBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5H7z"/></svg>';
-                downBtn.addEventListener("click", function(e) { e.preventDefault(); e.stopPropagation(); moveRow(topicId, 1); });
-
-                reorderWrap.appendChild(upBtn);
-                reorderWrap.appendChild(downBtn);
-                link.parentNode.insertBefore(reorderWrap, link);
               }
 
               if (!row.querySelector(".lms-status-badge")) {
