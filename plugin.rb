@@ -24,14 +24,17 @@ after_initialize do
   # Category: is this an LMS course?
   Site.preloaded_category_custom_fields << "lms_enabled"
   register_category_custom_field_type("lms_enabled", :boolean)
+  register_editable_category_custom_field("lms_enabled")
 
   # Category: sort order for lessons (created, title, manual)
   Site.preloaded_category_custom_fields << "lms_sort_order"
   register_category_custom_field_type("lms_sort_order", :string)
+  register_editable_category_custom_field("lms_sort_order")
 
   # Category: is this a Roadmap (voting overview)?
   Site.preloaded_category_custom_fields << "roadmap_enabled"
   register_category_custom_field_type("roadmap_enabled", :boolean)
+  register_editable_category_custom_field("roadmap_enabled")
 
   # Topic: lesson position within course — preload in topic lists
   register_topic_custom_field_type("lms_position", :integer)
