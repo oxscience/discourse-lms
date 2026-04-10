@@ -124,7 +124,7 @@ export default apiInitializer((api) => {
   api.onPageChange(function(url) {
     // Clean up old LMS elements from previous category page
     document.querySelectorAll(".lms-course-header, .lms-progress-bar").forEach(function(el) { el.remove(); });
-    document.querySelectorAll(".lms-position, .lms-status-badge").forEach(function(el) { el.remove(); });
+    document.querySelectorAll(".lms-position, .lms-position-input, .lms-status-badge").forEach(function(el) { el.remove(); });
 
     if (!url.match(/^\/c\//)) return;
 
@@ -266,8 +266,12 @@ export default apiInitializer((api) => {
 
       // Topic list: reorder DOM rows to match LMS sort, then add badges and auto-numbering
       if (currentUser) {
+        var urlAtStart = url;
         ajax("/lms/lessons/" + categoryId + ".json")
           .then(function(data) {
+            // Bail if user navigated away while we were fetching
+            if (window.location.pathname !== urlAtStart) return;
+
             var lessons = data.lessons || [];
 
             // Build ordered topic ID list and lookup maps
@@ -288,28 +292,50 @@ export default apiInitializer((api) => {
               }
             }
 
-            // Collect all topic rows and map them by topic ID
-            var rows = document.querySelectorAll("tr.topic-list-item, .topic-list-item");
-            var rowById = {};
-            rows.forEach(function(row) {
-              var link = row.querySelector("a.title.raw-link, a.raw-topic-link");
-              if (!link) return;
-              var href = link.getAttribute("href") || "";
-              var match = href.match(/\/t\/[^/]+\/(\d+)/);
-              if (!match) return;
-              rowById[parseInt(match[1], 10)] = row;
-            });
+            // Wait until the topic list DOM is stable (no leftover rows from the
+            // previous category). Ember's SPA nav can leave stale rows visible for
+            // a moment; reordering them would mix categories. Retry up to 5x.
+            function runWhenStable(attemptsLeft) {
+              if (window.location.pathname !== urlAtStart) return;
 
-            // Reorder DOM rows to match LMS lesson order
-            if (rows.length > 0) {
-              var parent = rows[0].parentNode;
-              if (parent) {
-                orderedIds.forEach(function(id) {
-                  var row = rowById[id];
-                  if (row) parent.appendChild(row);
-                });
+              var rows = document.querySelectorAll("tr.topic-list-item, .topic-list-item");
+              var rowById = {};
+              var foreignRows = 0;
+              rows.forEach(function(row) {
+                var link = row.querySelector("a.title.raw-link, a.raw-topic-link");
+                if (!link) return;
+                var href = link.getAttribute("href") || "";
+                var match = href.match(/\/t\/[^/]+\/(\d+)/);
+                if (!match) return;
+                var tid = parseInt(match[1], 10);
+                rowById[tid] = row;
+                if (!byId[tid]) foreignRows++;
+              });
+
+              // If the DOM still holds rows from a different category, wait it out.
+              if ((rows.length === 0 || foreignRows > 0) && attemptsLeft > 0) {
+                setTimeout(function() { runWhenStable(attemptsLeft - 1); }, 200);
+                return;
               }
+
+              // Give up silently if DOM never stabilizes — at least don't make it worse.
+              if (foreignRows > 0) return;
+
+              applyReorderAndBadges(rowById);
             }
+
+            function applyReorderAndBadges(rowById) {
+              // Reorder DOM rows to match LMS lesson order
+              var firstId = Object.keys(rowById)[0];
+              if (firstId) {
+                var parent = rowById[firstId].parentNode;
+                if (parent) {
+                  orderedIds.forEach(function(id) {
+                    var row = rowById[id];
+                    if (row) parent.appendChild(row);
+                  });
+                }
+              }
 
             // Helper: save positions to server and reload
             function savePositions(orderedTopicIds) {
@@ -403,6 +429,9 @@ export default apiInitializer((api) => {
                 }
               }
             });
+            }
+
+            runWhenStable(5);
           })
           .catch(function() {});
       }
