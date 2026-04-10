@@ -71,6 +71,35 @@ after_initialize do
   # Clear cache when categories change
   on(:site_setting_changed) { lms_category_ids_cache.clear }
 
+  # --- Server-side topic ordering for LMS categories ---
+  # Discourse normally sorts category topic lists by activity (bumped_at).
+  # For LMS categories we sort by the configured lms_sort_order
+  # (created | title | manual) so the list renders in the correct order on
+  # first paint — no client-side DOM reshuffling, no flicker, no races.
+  module ::DiscourseLms::TopicQueryLmsOrdering
+    def apply_ordering(result, options = {})
+      category_id = options[:category] || @options[:category]
+      return super unless category_id
+
+      cat = Category.find_by(id: category_id.to_i)
+      return super unless cat&.custom_fields&.[]("lms_enabled")
+
+      sort_order = cat.custom_fields["lms_sort_order"].presence || "created"
+      case sort_order
+      when "title"
+        result.reorder("topics.title ASC")
+      when "manual"
+        result
+          .joins("LEFT JOIN topic_custom_fields tcf_pos ON tcf_pos.topic_id = topics.id AND tcf_pos.name = 'lms_position'")
+          .reorder(Arel.sql("CAST(COALESCE(tcf_pos.value, '99999') AS INTEGER) ASC, topics.created_at ASC"))
+      else # "created"
+        result.reorder("topics.created_at ASC")
+      end
+    end
+  end
+
+  reloadable_patch { ::TopicQuery.prepend(::DiscourseLms::TopicQueryLmsOrdering) }
+
   # --- Serializers ---
 
   # Expose lms_enabled on categories

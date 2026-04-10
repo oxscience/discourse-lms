@@ -266,12 +266,8 @@ export default apiInitializer((api) => {
 
       // Topic list: reorder DOM rows to match LMS sort, then add badges and auto-numbering
       if (currentUser) {
-        var urlAtStart = url;
         ajax("/lms/lessons/" + categoryId + ".json")
           .then(function(data) {
-            // Bail if user navigated away while we were fetching
-            if (window.location.pathname !== urlAtStart) return;
-
             var lessons = data.lessons || [];
 
             // Build ordered topic ID list and lookup maps
@@ -292,50 +288,19 @@ export default apiInitializer((api) => {
               }
             }
 
-            // Wait until the topic list DOM is stable (no leftover rows from the
-            // previous category). Ember's SPA nav can leave stale rows visible for
-            // a moment; reordering them would mix categories. Retry up to 5x.
-            function runWhenStable(attemptsLeft) {
-              if (window.location.pathname !== urlAtStart) return;
-
-              var rows = document.querySelectorAll("tr.topic-list-item, .topic-list-item");
-              var rowById = {};
-              var foreignRows = 0;
-              rows.forEach(function(row) {
-                var link = row.querySelector("a.title.raw-link, a.raw-topic-link");
-                if (!link) return;
-                var href = link.getAttribute("href") || "";
-                var match = href.match(/\/t\/[^/]+\/(\d+)/);
-                if (!match) return;
-                var tid = parseInt(match[1], 10);
-                rowById[tid] = row;
-                if (!byId[tid]) foreignRows++;
-              });
-
-              // If the DOM still holds rows from a different category, wait it out.
-              if ((rows.length === 0 || foreignRows > 0) && attemptsLeft > 0) {
-                setTimeout(function() { runWhenStable(attemptsLeft - 1); }, 200);
-                return;
-              }
-
-              // Give up silently if DOM never stabilizes — at least don't make it worse.
-              if (foreignRows > 0) return;
-
-              applyReorderAndBadges(rowById);
-            }
-
-            function applyReorderAndBadges(rowById) {
-              // Reorder DOM rows to match LMS lesson order
-              var firstId = Object.keys(rowById)[0];
-              if (firstId) {
-                var parent = rowById[firstId].parentNode;
-                if (parent) {
-                  orderedIds.forEach(function(id) {
-                    var row = rowById[id];
-                    if (row) parent.appendChild(row);
-                  });
-                }
-              }
+            // Collect topic rows (order is already correct — server sorts them
+            // for LMS categories via TopicQuery#apply_ordering). We only need
+            // the row lookup here to attach numbers/badges below.
+            var rows = document.querySelectorAll("tr.topic-list-item, .topic-list-item");
+            var rowById = {};
+            rows.forEach(function(row) {
+              var link = row.querySelector("a.title.raw-link, a.raw-topic-link");
+              if (!link) return;
+              var href = link.getAttribute("href") || "";
+              var match = href.match(/\/t\/[^/]+\/(\d+)/);
+              if (!match) return;
+              rowById[parseInt(match[1], 10)] = row;
+            });
 
             // Helper: save positions to server and reload
             function savePositions(orderedTopicIds) {
@@ -429,9 +394,6 @@ export default apiInitializer((api) => {
                 }
               }
             });
-            }
-
-            runWhenStable(5);
           })
           .catch(function() {});
       }
