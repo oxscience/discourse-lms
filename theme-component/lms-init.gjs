@@ -131,7 +131,21 @@ export default apiInitializer((api) => {
     var categoryId = getCategoryIdFromUrl(url);
     if (!categoryId) return;
 
-    setTimeout(function() {
+    // Wait for the category title element to exist instead of a fixed 600ms
+    // delay. requestAnimationFrame polls once per paint (~16ms), so the
+    // header appears on the first frame it can — no visible layout shift.
+    var framesLeft = 40; // ~640ms hard cap on slow devices
+    function waitForTitle() {
+      var titleReady = document.querySelector(".category-title-contents .category-name, .category-heading");
+      if (!titleReady && framesLeft-- > 0) {
+        requestAnimationFrame(waitForTitle);
+        return;
+      }
+      runLmsHeader();
+    }
+    requestAnimationFrame(waitForTitle);
+
+    function runLmsHeader() {
       var currentUser = api.getCurrentUser();
       var isAdmin = currentUser && currentUser.admin;
       var isLms = isLmsCategory(categoryId);
@@ -249,19 +263,29 @@ export default apiInitializer((api) => {
 
       if (!isLms) return;
 
-      // Progress bar
+      // Progress bar — insert a skeleton with 0% fill immediately so the
+      // space is reserved and layout doesn't jump when the ajax response
+      // arrives. We then update the existing element in place.
       var courseHeader = document.querySelector(".lms-course-header");
       if (courseHeader && !document.querySelector(".lms-progress-bar") && currentUser) {
+        var progressEl = document.createElement("div");
+        progressEl.className = "lms-progress-bar lms-progress-loading";
+        progressEl.innerHTML = '<div class="lms-progress-track"><div class="lms-progress-fill" style="width:0%"></div></div><span class="lms-progress-label">&nbsp;</span>';
+        courseHeader.appendChild(progressEl);
+
         ajax("/lms/progress/" + categoryId + ".json")
           .then(function(data) {
-            if (document.querySelector(".lms-progress-bar")) return;
-            var el = document.createElement("div");
-            el.className = "lms-progress-bar";
+            progressEl.classList.remove("lms-progress-loading");
             var pct = data.percent || 0;
-            el.innerHTML = '<div class="lms-progress-track"><div class="lms-progress-fill" style="width:' + pct + '%"></div></div><span class="lms-progress-label">' + data.completed + " von " + data.total + " Lektionen abgeschlossen</span>";
-            courseHeader.appendChild(el);
+            var fill = progressEl.querySelector(".lms-progress-fill");
+            var label = progressEl.querySelector(".lms-progress-label");
+            if (fill) fill.style.width = pct + "%";
+            if (label) label.textContent = data.completed + " von " + data.total + " Lektionen abgeschlossen";
           })
-          .catch(function() {});
+          .catch(function() {
+            // Leave the skeleton as-is; better than flashing an error.
+            progressEl.classList.remove("lms-progress-loading");
+          });
       }
 
       // Topic list: reorder DOM rows to match LMS sort, then add badges and auto-numbering
@@ -397,7 +421,7 @@ export default apiInitializer((api) => {
           })
           .catch(function() {});
       }
-    }, 600);
+    }
   });
 
 });
