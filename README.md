@@ -15,33 +15,33 @@ Discourse-Plugin, das Kategorien in strukturierte **LMS-Kurse** verwandelt — m
 - **Completion-Tracking** — Button am Ende jeder Lektion zum Markieren als abgeschlossen
 - **Nächste Lektion** — nach Abschluss erscheint Link zur nächsten Lektion
 - **Needs-Review** — wenn ein Topic-Erstbeitrag bearbeitet wird, werden bestehende Abschlüsse als "Aktualisiert" markiert + Notification
-- **DOM-Reordering** — Topic-Liste wird automatisch in LMS-Reihenfolge umsortiert (überschreibt Discourse-Standardsortierung)
+- **Server-seitige Topic-Sortierung** — `TopicQuery#apply_ordering` Prepend sortiert Topic-Listen in LMS-Kategorien direkt in SQL nach `lms_sort_order` (kein Client-seitiges DOM-Reshuffling, kein Flicker)
 
 ## Architektur
 
-Split in zwei Teile:
+Split in zwei Repos:
 
-| Teil | Technologie | Deployment |
-|------|-------------|------------|
-| **Backend-Plugin** | Ruby (plugin.rb, Controller) | GitHub → `app.yml` → Rebuild |
-| **Theme Component** | JS/CSS (lms-init.gjs, lms.scss) | Admin API (kein Rebuild nötig) |
+| Teil | Repo | Technologie | Deployment |
+|------|------|-------------|------------|
+| **Backend-Plugin** | [oxscience/discourse-lms](https://github.com/oxscience/discourse-lms) | Ruby (plugin.rb, Controller) | GitHub → `app.yml` → Rebuild |
+| **Theme Component** | [oxscience/discourse-lms-theme](https://github.com/oxscience/discourse-lms-theme) | JS/CSS (lms-init.gjs, common.scss) | Admin → Themes → Install from Git |
 
 ## Dateistruktur
 
 ```
 discourse-lms-plugin/
-├── plugin.rb                          # Custom Fields, Serializer, Event Hooks, Routes
+├── plugin.rb                          # Custom Fields, Serializer, Event Hooks, Routes,
+│                                      # TopicQuery#apply_ordering Prepend
 ├── app/
 │   └── controllers/
 │       └── lms_controller.rb          # API-Endpoints (progress, lessons, complete, reorder)
 ├── config/
 │   ├── settings.yml                   # Site Settings (lms_enabled, Button-Texte)
 │   └── locales/
-├── theme-component/
-│   ├── lms-init.gjs                   # Frontend-Logik (Completion, Progress, Numbering)
-│   └── lms.scss                       # Styling
 └── README.md
 ```
+
+Frontend (lms-init.gjs, common.scss) liegt im **separaten Theme-Repo** [oxscience/discourse-lms-theme](https://github.com/oxscience/discourse-lms-theme).
 
 ## Custom Fields
 
@@ -65,16 +65,9 @@ Alle unter `/lms/` gemountet, erfordern Login.
 
 ## Deployment
 
-### Theme Component (JS/CSS) — sofort live
+### Theme Component (JS/CSS) — eigenes Repo
 
-```bash
-# Per Admin API deployen (kein Rebuild nötig):
-curl -X PUT \
-  -H "Api-Key: $API_KEY" -H "Api-Username: $API_USER" \
-  -H "Content-Type: application/json" \
-  -d '{"theme": {"theme_fields": [...]}}' \
-  "https://<your-discourse>/admin/themes/<theme-id>.json"
-```
+Liegt in [oxscience/discourse-lms-theme](https://github.com/oxscience/discourse-lms-theme). Updates: `git push` → Admin → Customize → Themes → "LMS Course Tracker" → "Check for updates".
 
 ### Backend-Plugin (Ruby) — erfordert Rebuild
 
