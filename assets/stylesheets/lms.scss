@@ -1,0 +1,79 @@
+// --- Completion Button (Topic Page) ---
+.lms-completion-wrapper {
+  margin-top: 1.5em;
+  padding-top: 1em;
+  border-top: 1px solid var(--primary-low);
+}
+
+.lms-complete-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+
+  &.lms-completed {
+    border-color: var(--success);
+    color: var(--success);
+  }
+
+  &.lms-needs-review {
+    border-color: var(--highlight);
+    color: var(--highlight);
+  }
+}
+
+// --- Topic List: Status Badges ---
+.lms-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  font-size: 0.78em;
+  padding: 0.15em 0.5em;
+  border-radius: 3px;
+  margin-left: 0.5em;
+  vertical-align: middle;
+
+  &.lms-done {
+    color: var(--success);
+    background: rgba(0, 128, 0, 0.12);
+  }
+
+  &.lms-needs-review {
+    color: var(--highlight);
+    background: rgba(255, 165, 0, 0.12);
+  }
+}
+
+// --- Topic List: Position Numbers ---
+.lms-position {
+  font-weight: 700;
+  color: var(--primary-medium);
+  margin-right: 0.15em;
+}
+
+// --- Category Page: Progress Bar ---
+.lms-progress-bar {
+  margin: 0.75em 0 1em;
+  max-width: 400px;
+}
+
+.lms-progress-track {
+  height: 8px;
+  background: var(--primary-low);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.lms-progress-fill {
+  height: 100%;
+  background: var(--success);
+  border-radius: 4px;
+  transition: width 0.4s ease;
+  min-width: 0;
+}
+
+.lms-progress-label {
+  display: block;
+  font-size: 0.82em;
+  color: var(--primary-medium);
+  margin-top: 0.35em;
+}
