@@ -2,7 +2,7 @@
 
 # name: discourse-lms
 # about: Turns Discourse categories into structured LMS courses with completion tracking, ordered lessons, and progress indicators.
-# version: 0.1.1
+# version: 0.2.0
 # authors: Pat
 # url: https://github.com/your-org/discourse-lms-plugin
 # required_version: 2.7.0
@@ -16,6 +16,62 @@ after_initialize do
     class Engine < ::Rails::Engine
       engine_name PLUGIN_NAME
       isolate_namespace DiscourseLms
+    end
+
+    # Issue a certificate when the user has every topic in `category` marked
+    # complete and none of them flagged needs_review. Idempotent: re-activates
+    # a previously outdated cert instead of issuing a new one.
+    def self.issue_certificate_if_complete(user, category)
+      return nil unless user && category
+      return nil unless category.custom_fields["lms_enabled"]
+
+      topic_ids = Topic.where(category_id: category.id, archetype: Archetype.default, deleted_at: nil).pluck(:id)
+      return nil if topic_ids.empty?
+
+      all_valid = topic_ids.all? do |tid|
+        data = PluginStore.get(PLUGIN_NAME, "completed_#{user.id}_#{tid}")
+        data.present? && !(data.is_a?(Hash) && data["needs_review"] == true)
+      end
+      return nil unless all_valid
+
+      cert_key = "cert_#{user.id}_#{category.id}"
+      existing = PluginStore.get(PLUGIN_NAME, cert_key)
+
+      if existing.is_a?(Hash)
+        if existing["status"] == "outdated"
+          existing["status"] = "active"
+          existing["reactivated_at"] = Time.now.iso8601
+          PluginStore.set(PLUGIN_NAME, cert_key, existing)
+        end
+        return existing
+      end
+
+      display_name = (user.custom_fields["lms_cert_name"].presence ||
+                      user.name.presence ||
+                      user.username).to_s
+
+      cert = {
+        "cert_id" => SecureRandom.urlsafe_base64(16),
+        "issued_at" => Time.now.iso8601,
+        "display_name" => display_name,
+        "category_id" => category.id,
+        "category_name" => category.name,
+        "status" => "active"
+      }
+      PluginStore.set(PLUGIN_NAME, cert_key, cert)
+      cert
+    end
+
+    # Mark an active cert as outdated. No-op if cert doesn't exist or is
+    # already outdated.
+    def self.mark_certificate_outdated(user_id, category_id)
+      return unless user_id && category_id
+      cert_key = "cert_#{user_id}_#{category_id}"
+      cert = PluginStore.get(PLUGIN_NAME, cert_key)
+      return unless cert.is_a?(Hash) && cert["status"] == "active"
+      cert["status"] = "outdated"
+      cert["outdated_at"] = Time.now.iso8601
+      PluginStore.set(PLUGIN_NAME, cert_key, cert)
     end
   end
 
@@ -50,6 +106,7 @@ after_initialize do
     get "/progress/:category_id" => "lms#category_progress"
     get "/lessons/:category_id" => "lms#category_lessons"
     put "/reorder/:category_id" => "lms#reorder"
+    get "/certificates" => "lms#certificates"
   end
 
   Discourse::Application.routes.append do
@@ -230,6 +287,8 @@ after_initialize do
       user_id = row.key.match(/completed_(\d+)_/)[1].to_i
       user = User.find_by(id: user_id)
       next unless user
+
+      DiscourseLms.mark_certificate_outdated(user_id, category.id)
 
       Notification.create!(
         notification_type: Notification.types[:custom],

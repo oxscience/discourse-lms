@@ -19,14 +19,30 @@ module DiscourseLms
 
       if existing
         PluginStore.remove(PLUGIN_NAME, key)
+        DiscourseLms.mark_certificate_outdated(current_user.id, category.id)
         render json: { completed: false, needs_review: false }
       else
         PluginStore.set(PLUGIN_NAME, key, {
           completed_at: Time.now.iso8601,
           needs_review: false
         })
-        render json: { completed: true, needs_review: false }
+        cert = DiscourseLms.issue_certificate_if_complete(current_user, category)
+        render json: { completed: true, needs_review: false, certificate: cert }
       end
+    end
+
+    # GET /lms/certificates
+    # Returns all certificates for the current user (active + outdated)
+    def certificates
+      rows = PluginStoreRow.where(plugin_name: PLUGIN_NAME)
+                           .where("key LIKE ?", "cert_#{current_user.id}_%")
+      certs = rows.map do |row|
+        data = JSON.parse(row.value) rescue nil
+        next unless data.is_a?(Hash)
+        data
+      end.compact.sort_by { |c| c["issued_at"].to_s }.reverse
+
+      render json: { certificates: certs }
     end
 
     # GET /lms/progress/:category_id
