@@ -45,6 +45,28 @@ module DiscourseLms
       render json: { certificates: certs }
     end
 
+    # PUT /lms/certificate/:category_id
+    # Update display_name on an existing cert and store it as the user's
+    # default for future certs. Only the cert's owner can update it.
+    def update_certificate
+      category_id = params[:category_id].to_i
+      raw_name = params[:display_name].to_s.strip
+      raise Discourse::InvalidParameters.new(:display_name) if raw_name.empty?
+      display_name = raw_name[0, 120]
+
+      cert_key = "cert_#{current_user.id}_#{category_id}"
+      cert = PluginStore.get(PLUGIN_NAME, cert_key)
+      raise Discourse::NotFound unless cert.is_a?(Hash)
+
+      cert["display_name"] = display_name
+      PluginStore.set(PLUGIN_NAME, cert_key, cert)
+
+      current_user.custom_fields["lms_cert_name"] = display_name
+      current_user.save_custom_fields
+
+      render json: { certificate: cert }
+    end
+
     # GET /lms/progress/:category_id
     # Returns completion progress for current user in a course category
     def category_progress

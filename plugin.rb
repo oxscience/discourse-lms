@@ -38,12 +38,15 @@ after_initialize do
       existing = PluginStore.get(PLUGIN_NAME, cert_key)
 
       if existing.is_a?(Hash)
+        # Reactivate outdated cert and surface it; otherwise stay silent so
+        # repeat toggles don't re-trigger the celebration modal.
         if existing["status"] == "outdated"
           existing["status"] = "active"
           existing["reactivated_at"] = Time.now.iso8601
           PluginStore.set(PLUGIN_NAME, cert_key, existing)
+          return existing
         end
-        return existing
+        return nil
       end
 
       display_name = (user.custom_fields["lms_cert_name"].presence ||
@@ -107,6 +110,7 @@ after_initialize do
     get "/lessons/:category_id" => "lms#category_lessons"
     put "/reorder/:category_id" => "lms#reorder"
     get "/certificates" => "lms#certificates"
+    put "/certificate/:category_id" => "lms#update_certificate"
   end
 
   Discourse::Application.routes.append do
