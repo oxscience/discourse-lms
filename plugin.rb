@@ -25,7 +25,9 @@ after_initialize do
       return nil unless user && category
       return nil unless category.custom_fields["lms_enabled"]
 
-      topic_ids = Topic.where(category_id: category.id, archetype: Archetype.default, deleted_at: nil).pluck(:id)
+      # The "About the category" topic is not a lesson
+      topic_ids = Topic.where(category_id: category.id, archetype: Archetype.default, deleted_at: nil)
+                       .where.not(id: category.topic_id).pluck(:id)
       return nil if topic_ids.empty?
 
       all_valid = topic_ids.all? do |tid|

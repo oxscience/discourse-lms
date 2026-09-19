@@ -76,6 +76,7 @@ module DiscourseLms
       topic_ids = Topic.where(category_id: category.id)
                        .where(archetype: Archetype.default)
                        .where(deleted_at: nil)
+                       .where.not(id: category.topic_id) # "About the category" topic is not a lesson
                        .pluck(:id)
 
       total = topic_ids.size
@@ -131,6 +132,7 @@ module DiscourseLms
       topics = Topic.where(category_id: category.id)
                     .where(archetype: Archetype.default)
                     .where(deleted_at: nil)
+                    .where.not(id: category.topic_id) # "About the category" topic is not a lesson
                     .select(:id, :title, :slug, :created_at)
 
       lessons = topics.map do |t|
