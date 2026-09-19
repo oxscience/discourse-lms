@@ -150,9 +150,14 @@ after_initialize do
       when "title"
         result.reorder("topics.title ASC")
       when "manual"
-        result
-          .joins("LEFT JOIN topic_custom_fields tcf_pos ON tcf_pos.topic_id = topics.id AND tcf_pos.name = 'lms_position'")
-          .reorder(Arel.sql("CAST(COALESCE(tcf_pos.value, '99999') AS INTEGER) ASC, topics.created_at ASC"))
+        # Subquery instead of JOIN: duplicate lms_position rows must not duplicate topics
+        result.reorder(Arel.sql(<<~SQL.squish))
+          COALESCE((
+            SELECT CAST(tcf_pos.value AS INTEGER) FROM topic_custom_fields tcf_pos
+            WHERE tcf_pos.topic_id = topics.id AND tcf_pos.name = 'lms_position'
+            ORDER BY tcf_pos.id DESC LIMIT 1
+          ), 99999) ASC, topics.created_at ASC
+        SQL
       else # "created"
         result.reorder("topics.created_at ASC")
       end
@@ -192,7 +197,7 @@ after_initialize do
 
   # Expose lms_position on topics (single topic view)
   add_to_serializer(:topic_view, :lms_position) do
-    object.topic.custom_fields["lms_position"]
+    Array(object.topic.custom_fields["lms_position"]).last
   end
 
   add_to_serializer(:topic_view, :include_lms_position?) do
@@ -227,7 +232,7 @@ after_initialize do
   end
 
   add_to_serializer(:topic_list_item, :lms_position) do
-    object.custom_fields["lms_position"]
+    Array(object.custom_fields["lms_position"]).last
   end
 
   add_to_serializer(:topic_list_item, :include_lms_position?) do

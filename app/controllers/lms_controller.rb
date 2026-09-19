@@ -140,7 +140,7 @@ module DiscourseLms
           id: t.id,
           title: t.title,
           slug: t.slug,
-          position: pos.to_i,
+          position: Array(pos).last.to_i, # duplicate rows make custom_fields return an Array
           created_at: t.created_at.iso8601,
           completed: data.present?,
           needs_review: data.is_a?(Hash) && data["needs_review"] == true
@@ -171,10 +171,14 @@ module DiscourseLms
       positions = params.require(:positions).permit!.to_h
 
       positions.each do |topic_id, position|
-        topic = Topic.find_by(id: topic_id, category_id: category.id)
-        next unless topic
-        topic.custom_fields["lms_position"] = position.to_i
-        topic.save_custom_fields
+        # Row lock: topic_custom_fields has no unique index, so two concurrent
+        # reorder requests would both insert an lms_position row.
+        Topic.transaction do
+          topic = Topic.lock.find_by(id: topic_id, category_id: category.id)
+          next unless topic
+          topic.custom_fields["lms_position"] = position.to_i
+          topic.save_custom_fields
+        end
       end
 
       render json: { success: true }
