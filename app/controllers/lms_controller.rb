@@ -113,7 +113,8 @@ module DiscourseLms
       render json: {
         topic_id: topic.id,
         completed: data.present?,
-        needs_review: data.is_a?(Hash) && data["needs_review"] == true
+        needs_review: data.is_a?(Hash) && data["needs_review"] == true,
+        update_note: data.is_a?(Hash) ? data["update_note"] : nil
       }
     end
 
@@ -145,7 +146,8 @@ module DiscourseLms
           position: Array(pos).last.to_i, # duplicate rows make custom_fields return an Array
           created_at: t.created_at.iso8601,
           completed: data.present?,
-          needs_review: data.is_a?(Hash) && data["needs_review"] == true
+          needs_review: data.is_a?(Hash) && data["needs_review"] == true,
+          update_note: data.is_a?(Hash) ? data["update_note"] : nil
         }
       end
 
@@ -159,6 +161,12 @@ module DiscourseLms
       end
 
       render json: { category_id: category.id, sort_order: sort_order, lessons: lessons }
+    end
+
+    # POST /lms/reviews/clear
+    # Marks all updated lessons of the current user as re-read at once
+    def clear_reviews
+      render json: { cleared: DiscourseLms.clear_reviews(current_user) }
     end
 
     # PUT /lms/reorder/:category_id

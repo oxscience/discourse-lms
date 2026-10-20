@@ -78,6 +78,36 @@ after_initialize do
       cert["outdated_at"] = Time.now.iso8601
       PluginStore.set(PLUGIN_NAME, cert_key, cert)
     end
+
+    # Only an edit whose reason starts with "Update:" is news to readers; the rest
+    # (PDF uploads, header, link and typo fixes) stays silent. The text after it is the note.
+    UPDATE_REASON = /\Aupdate:\s*/i
+
+    # Mark every updated lesson of `user` as re-read in one go: keeps completed_at,
+    # reactivates certificates and marks the "lesson updated" notifications read.
+    # Returns the number of lessons cleared.
+    def self.clear_reviews(user)
+      topic_ids = []
+      PluginStoreRow.where(plugin_name: PLUGIN_NAME)
+                    .where("key LIKE ?", "completed\\_#{user.id}\\_%").each do |row|
+        data = JSON.parse(row.value) rescue {}
+        next unless data.is_a?(Hash) && data["needs_review"] == true
+        data["needs_review"] = false
+        data["reviewed_at"] = Time.now.iso8601
+        row.update!(value: data.to_json, type_name: "JSON")
+        topic_ids << row.key[/\d+\z/].to_i
+      end
+      return 0 if topic_ids.empty?
+
+      Category.where(id: Topic.where(id: topic_ids).select(:category_id)).each do |category|
+        issue_certificate_if_complete(user, category)
+      end
+      Notification.where(user_id: user.id, read: false, notification_type: Notification.types[:custom])
+                  .where("data LIKE ?", "%discourse_lms.notifications.lesson_updated%")
+                  .update_all(read: true)
+      user.publish_notifications_state
+      topic_ids.size
+    end
   end
 
   # --- Custom Fields ---
@@ -113,6 +143,7 @@ after_initialize do
     put "/reorder/:category_id" => "lms#reorder"
     get "/certificates" => "lms#certificates"
     put "/certificate/:category_id" => "lms#update_certificate"
+    post "/reviews/clear" => "lms#clear_reviews"
   end
 
   Discourse::Application.routes.append do
@@ -270,10 +301,12 @@ after_initialize do
 
   # --- Event Hooks ---
 
-  # When a topic's first post is revised, mark completions as "needs_review"
+  # When a topic's first post gets an "Update: ..." edit, mark completions as "needs_review"
   on(:post_edited) do |post, _topic_changed, _revisor|
     next unless post.post_number == 1
     next unless SiteSetting.lms_enabled
+    # Discourse clears edit_reason on every new version without one, so this is the reason of this edit
+    next unless post.edit_reason.to_s.match?(DiscourseLms::UPDATE_REASON)
 
     topic = post.topic
     next unless topic
@@ -281,18 +314,24 @@ after_initialize do
     category = topic.category
     next unless category && category.custom_fields["lms_enabled"]
 
-    # Find all completions for this topic and flag them
+    note = post.edit_reason.sub(DiscourseLms::UPDATE_REASON, "").strip.presence
+
+    # Find all completions for this topic and flag them ("_" is a LIKE wildcard: escape it,
+    # otherwise an edit of topic 70 also matches completed_5_170)
     rows = PluginStoreRow.where(
       plugin_name: DiscourseLms::PLUGIN_NAME
-    ).where("key LIKE ?", "completed_%_#{topic.id}")
+    ).where("key LIKE ?", "completed\\_%\\_#{topic.id}")
 
     rows.each do |row|
       data = JSON.parse(row.value) rescue {}
-      next if data["needs_review"] == true
+      flagged = data["needs_review"] == true
 
+      # the note always tells the latest update; the notification goes out once until re-read
       data["needs_review"] = true
       data["revised_at"] = Time.now.iso8601
+      data["update_note"] = note
       row.update!(value: data.to_json, type_name: "JSON")
+      next if flagged
 
       # Send notification to the user
       user_id = row.key.match(/completed_(\d+)_/)[1].to_i
