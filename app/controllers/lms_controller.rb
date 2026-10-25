@@ -35,7 +35,7 @@ module DiscourseLms
     # Returns all certificates for the current user (active + outdated)
     def certificates
       rows = PluginStoreRow.where(plugin_name: PLUGIN_NAME)
-                           .where("key LIKE ?", "cert_#{current_user.id}_%")
+                           .where("key LIKE ?", "cert\\_#{current_user.id}\\_%")
       certs = rows.map do |row|
         data = JSON.parse(row.value) rescue nil
         next unless data.is_a?(Hash)
