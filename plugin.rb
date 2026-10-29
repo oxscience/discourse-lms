@@ -199,6 +199,52 @@ after_initialize do
 
   reloadable_patch { ::TopicQuery.prepend(::DiscourseLms::TopicQueryLmsOrdering) }
 
+  # --- Digest: new vs. updated topics ---
+  # After a content update the campus moves topics.created_at to the update time
+  # (tools/campus-touch-date.sh), so core counts every updated topic as new.
+  # The original creation date survives in user_actions (NEW_TOPIC); split topics
+  # have none, there updated_at still holds it (update_columns leaves it alone).
+  def DiscourseLms.created_since(topics, since)
+    topics.where(<<~SQL.squish, since)
+      LEAST(topics.created_at, topics.updated_at, (
+        SELECT MIN(ua.created_at) FROM user_actions ua
+        WHERE ua.target_topic_id = topics.id AND ua.action_type = #{UserAction::NEW_TOPIC}
+      )) > ?
+    SQL
+  end
+
+  # New topics first, the updated ones fill up the rest
+  register_modifier(:user_digest_content) do |content, user, since|
+    limit = SiteSetting.digest_topics + SiteSetting.digest_other_topics
+    fresh = DiscourseLms.created_since(Topic.for_digest(user, since, limit: limit, top_order: true), since)
+    content.merge(topics: (fresh.to_a + content[:topics].to_a).uniq.first(limit))
+  end
+
+  # Header stats: new | updated | unread notifications (likes and new users stay out)
+  module ::DiscourseLms::DigestCounts
+    def build_email(*args)
+      if action_name == "digest" && @counts.present? && SiteSetting.lms_enabled
+        topics = Topic.for_digest(@user, @since)
+        fresh = DiscourseLms.created_since(topics, @since).count
+        updated = topics.count - fresh
+        new_topics = @counts.find { |c| c[:id] == "new_topics" }
+        @counts = [
+          (new_topics.merge(value: fresh) if fresh > 0),
+          ({
+            id: "updated_topics",
+            label_key: "discourse_lms.digest.updated_topics",
+            value: updated,
+            href: "#{Discourse.base_url}/latest",
+          } if updated > 0),
+          *@counts.select { |c| c[:id] == "unread_notifications" },
+        ].compact
+      end
+      super
+    end
+  end
+
+  reloadable_patch { ::UserNotifications.prepend(::DiscourseLms::DigestCounts) }
+
   # --- Serializers ---
 
   # Expose lms_enabled on categories

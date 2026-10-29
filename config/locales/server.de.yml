@@ -5,5 +5,7 @@ de:
     lms_completion_button_text_complete: "Button-Text zum Markieren einer Lektion als abgeschlossen"
     lms_completion_button_text_undo: "Button-Text zum Aufheben des Abschlusses"
   discourse_lms:
+    digest:
+      updated_topics: "Aktualisierte Themen"
     notifications:
       lesson_updated: "Eine abgeschlossene Lektion wurde aktualisiert"
