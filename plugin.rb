@@ -220,8 +220,17 @@ after_initialize do
     content.merge(topics: (fresh.to_a + content[:topics].to_a).uniq.first(limit))
   end
 
-  # Header stats: new | updated | unread notifications (likes and new users stay out)
+  # Header stats: new | updated topics only (no notifications, likes or new users);
+  # teasers instead of whole first paragraphs
   module ::DiscourseLms::DigestCounts
+    def email_excerpt(html, post = nil)
+      return super unless action_name == "digest" && SiteSetting.lms_enabled
+      text = Nokogiri::HTML5.fragment(super).text.squish.sub(/\AKernbotschaft[.:]\s*/, "")
+      teaser = text.truncate(220, separator: " ", omission: "")
+      teaser = "#{teaser.sub(/[\s.,;:–-]+\z/, "")} …" if teaser.length < text.length
+      "<p>#{ERB::Util.html_escape(teaser)}</p>".html_safe
+    end
+
     def build_email(*args)
       if action_name == "digest" && @counts.present? && SiteSetting.lms_enabled
         topics = Topic.for_digest(@user, @since)
@@ -236,7 +245,6 @@ after_initialize do
             value: updated,
             href: "#{Discourse.base_url}/latest",
           } if updated > 0),
-          *@counts.select { |c| c[:id] == "unread_notifications" },
         ].compact
       end
       super
